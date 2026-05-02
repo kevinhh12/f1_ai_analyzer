@@ -1,0 +1,8 @@
+fastapi        # backend API framework
+uvicorn        # runs the FastAPI server
+fastf1         # gets Formula 1 race data
+pandas         # works with lap/race data tables
+matplotlib     # creates charts later
+jupyter        # runs exploration notebooks
+pytest         # testing
+python-dotenv  # loads .env variables, useful later for API keys
