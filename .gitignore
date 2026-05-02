@@ -1,4 +1,4 @@
 venv/
 __pycache__/
-cache/ # FastF1 cache data
-.env # for your API keys later
+cache/ 
+.env 
