@@ -1,15 +1,7 @@
 from fastapi import FastAPI
+from app.controllers.f1_data_controller import router as f1_router
 
 app = FastAPI()
+app.include_router(f1_router, prefix="/api")
 
-@app.get("/")
-def home():
-    return {
-        "message": "F1 AI Analyzer backend is running",
-        "docs": "/docs",
-        "health": "/health"
-    }
 
-@app.get("/health")
-def health():
-    return {"status": "ok"}
