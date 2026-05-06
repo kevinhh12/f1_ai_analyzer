@@ -96,3 +96,4 @@ def get_position(session_key: int, driver_number: int = None):
         )
 
     return {"session_key": session_key, "position": response.json()}
+
