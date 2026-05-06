@@ -1,0 +1,236 @@
+/* ============================================================
+   F1 Analyzer — Colors & Type
+   The product visualizes Formula 1 historical data: races,
+   drivers, lap times, telemetry, strategy. The visual system
+   borrows from motorsport broadcast graphics: dense data,
+   bold condensed type, racing red, paddock dark, team color
+   accents, and monospaced telemetry numerals.
+   ============================================================ */
+
+/* -------- Webfonts (loaded from Google Fonts CDN) ----------
+   See README — these are SUBSTITUTIONS for an unspecified
+   product type system. Original codebase uses system-ui only.
+   -------------------------------------------------------- */
+@import url('https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700&family=Archivo+Narrow:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+:root {
+  /* ============== COLOR — RAW PALETTE ============== */
+
+  /* Paddock — neutrals (cool, slightly blue-shifted, like asphalt under cloud cover) */
+  --paddock-0: #ffffff;
+  --paddock-50: #f5f6f8;
+  --paddock-100: #eaecf0;
+  --paddock-200: #d4d7de;
+  --paddock-300: #9ea2ac;
+  --paddock-400: #6a6e78;
+  --paddock-500: #3f434c;
+  --paddock-600: #2a2d34;
+  --paddock-700: #1c1e23;
+  --paddock-800: #131418;
+  --paddock-900: #0a0b0d;
+
+  /* Racing Red — primary brand */
+  --racing-50: #fff1f1;
+  --racing-100: #ffd7d7;
+  --racing-300: #ff6b6b;
+  --racing-500: #e10600;          /* Hero red — the iconic F1 red */
+  --racing-600: #b80500;
+  --racing-700: #8a0400;
+
+  /* Track Yellow — caution / soft tyre / warnings */
+  --flag-yellow: #ffd400;
+  --flag-yellow-dim: #b89900;
+
+  /* Pole Green — fastest lap, go signal */
+  --pole-green: #00d27a;
+  --pole-green-dim: #008a4f;
+
+  /* Telemetry Blue — data lines, info */
+  --telemetry-blue: #2bb6ff;
+  --telemetry-blue-dim: #0d6fa8;
+
+  /* Tyre compound colors (FIA spec) */
+  --tyre-soft: #ff2e2e;
+  --tyre-medium: #ffd400;
+  --tyre-hard: #f3f3f3;
+  --tyre-inter: #00d27a;
+  --tyre-wet: #2bb6ff;
+
+  /* ============== SEMANTIC — SURFACES ============== */
+  --bg:            var(--paddock-900);   /* App background — broadcast dark */
+  --bg-elevated:   var(--paddock-800);   /* Cards, panels */
+  --bg-raised:     var(--paddock-700);   /* Hover, sub-panels */
+  --bg-inset:      var(--paddock-900);   /* Inputs, code, recessed */
+  --bg-muted:      var(--paddock-600);
+
+  --border:        var(--paddock-600);
+  --border-strong: var(--paddock-500);
+  --border-subtle: var(--paddock-700);
+
+  /* ============== SEMANTIC — INK ============== */
+  --fg:            var(--paddock-0);     /* Headings, primary numbers */
+  --fg-muted:      var(--paddock-200);   /* Body */
+  --fg-subtle:     var(--paddock-300);   /* Labels, captions */
+  --fg-faint:      var(--paddock-400);   /* Disabled, scaffolding */
+  --fg-on-accent:  var(--paddock-0);
+
+  /* ============== SEMANTIC — ACCENT / STATE ============== */
+  --accent:        var(--racing-500);
+  --accent-hover:  var(--racing-600);
+  --accent-bg:     rgba(225, 6, 0, 0.12);
+  --accent-border: rgba(225, 6, 0, 0.45);
+
+  --success:       var(--pole-green);
+  --warning:       var(--flag-yellow);
+  --info:          var(--telemetry-blue);
+  --danger:        var(--racing-500);
+
+  /* ============== TYPE — FAMILIES ============== */
+  --font-display:  'Archivo Narrow', 'Helvetica Neue', sans-serif;  /* Condensed — headlines, lap counters */
+  --font-sans:     'Archivo', 'Helvetica Neue', system-ui, sans-serif;
+  --font-mono:     'JetBrains Mono', ui-monospace, Consolas, monospace;
+  --font-numeric:  'JetBrains Mono', ui-monospace, monospace;       /* tabular nums for timing screens */
+
+  /* ============== TYPE — SCALE ============== */
+  --text-xs:    11px;
+  --text-sm:    13px;
+  --text-base:  15px;
+  --text-md:    17px;
+  --text-lg:    20px;
+  --text-xl:    24px;
+  --text-2xl:   32px;
+  --text-3xl:   44px;
+  --text-4xl:   64px;
+  --text-5xl:   96px;   /* Big lap times, sector clocks */
+
+  /* ============== SPACING ============== */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ============== RADIUS ============== */
+  --radius-sm:   2px;   /* Sharp — telemetry chips */
+  --radius-md:   4px;   /* Default — buttons, cards */
+  --radius-lg:   8px;   /* Modals */
+  --radius-pill: 999px;
+
+  /* ============== SHADOWS ============== */
+  --shadow-sm:  0 1px 2px rgba(0,0,0,0.4);
+  --shadow-md:  0 4px 12px rgba(0,0,0,0.5);
+  --shadow-lg:  0 12px 32px rgba(0,0,0,0.6);
+  --shadow-glow-red:    0 0 0 1px var(--racing-500), 0 0 24px rgba(225,6,0,0.35);
+  --shadow-glow-green:  0 0 0 1px var(--pole-green), 0 0 24px rgba(0,210,122,0.30);
+
+  /* ============== MOTION ============== */
+  --ease-out:  cubic-bezier(.2,.7,.2,1);
+  --ease-in:   cubic-bezier(.6,.0,.8,.3);
+  --ease-snap: cubic-bezier(.5,0,0,1);
+  --dur-fast:  120ms;
+  --dur-base:  200ms;
+  --dur-slow:  360ms;
+}
+
+/* ============================================================
+   SEMANTIC TYPE STYLES
+   Use class names OR base elements — both wired to vars above.
+   ============================================================ */
+
+html, body {
+  font: 400 var(--text-base)/1.5 var(--font-sans);
+  color: var(--fg-muted);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.h-display, h1.display {
+  font: 800 var(--text-5xl)/0.9 var(--font-display);
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  color: var(--fg);
+  margin: 0;
+}
+
+h1, .h1 {
+  font: 700 var(--text-3xl)/1.05 var(--font-display);
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  color: var(--fg);
+  margin: 0;
+}
+
+h2, .h2 {
+  font: 600 var(--text-2xl)/1.1 var(--font-display);
+  letter-spacing: 0;
+  color: var(--fg);
+  margin: 0;
+}
+
+h3, .h3 {
+  font: 600 var(--text-lg)/1.2 var(--font-sans);
+  letter-spacing: -0.005em;
+  color: var(--fg);
+  margin: 0;
+}
+
+h4, .h4, .eyebrow {
+  font: 600 var(--text-xs)/1 var(--font-sans);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+  margin: 0;
+}
+
+p, .p {
+  font: 400 var(--text-base)/1.55 var(--font-sans);
+  color: var(--fg-muted);
+  margin: 0;
+}
+
+.p-sm { font-size: var(--text-sm); }
+.p-lg { font-size: var(--text-md); }
+
+.label {
+  font: 600 var(--text-xs)/1 var(--font-sans);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+
+.numeric, .timing {
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+}
+
+.timing-hero {
+  font: 700 var(--text-4xl)/1 var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+}
+
+code, .code {
+  font: 400 var(--text-sm)/1.4 var(--font-mono);
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+a:hover { border-bottom-color: var(--accent); }
