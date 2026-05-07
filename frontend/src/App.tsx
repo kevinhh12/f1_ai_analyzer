@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import './styles.css';
-import { F1_DATA } from './data.js';
+import { F1_DATA, type Race } from './data';
 import Classification from './components/Classification';
 import LapChart from './components/LapChart';
 import StatGrid from './components/StatGrid';
@@ -8,7 +8,13 @@ import TopBar from './components/TopBar';
 import TyreStrategy from './components/TyreStrategy';
 import Sidebar from './components/Sidebar';
 
-function Scrubber({ totalLaps, lap, onChange }) {
+interface ScrubberProps {
+  totalLaps: number;
+  lap: number;
+  onChange: React.Dispatch<React.SetStateAction<number>>;
+}
+
+function Scrubber({ totalLaps, lap, onChange }: ScrubberProps) {
   const [playing, setPlaying] = useState(false);
   useEffect(() => {
     if (!playing) return;
@@ -25,13 +31,20 @@ function Scrubber({ totalLaps, lap, onChange }) {
       </button>
       <span className="lap-lbl">LAP</span>
       <input type="range" min="1" max={totalLaps} value={lap}
-             onChange={e => onChange(Number(e.target.value))}/>
+             onChange={e => onChange(Number(e.target.value))} />
       <span className="lap-v">{lap}/{totalLaps}</span>
     </div>
   );
-};
+}
 
-function RacePicker({ races, activeRound, onPick, onClose }) {
+interface RacePickerProps {
+  races: Race[];
+  activeRound: number;
+  onPick: (race: Race) => void;
+  onClose: () => void;
+}
+
+function RacePicker({ races, activeRound, onPick, onClose }: RacePickerProps) {
   return (
     <div className="scrim" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
@@ -44,7 +57,7 @@ function RacePicker({ races, activeRound, onPick, onClose }) {
             <button key={r.round}
                     className={"modal-row" + (r.round === activeRound ? " active" : "")}
                     onClick={() => { onPick(r); onClose(); }}>
-              <span className="rd">R{String(r.round).padStart(2,'0')}</span>
+              <span className="rd">R{String(r.round).padStart(2, '0')}</span>
               <span className="nm">{r.name}</span>
               <span className="dt">{r.date}</span>
             </button>
@@ -53,12 +66,12 @@ function RacePicker({ races, activeRound, onPick, onClose }) {
       </div>
     </div>
   );
-};
+}
 
 export default function App() {
   const D = F1_DATA;
   const [activeRound, setActiveRound] = useState(6);
-  const race = D.races.find(r => r.round === activeRound) || D.races[0];
+  const race = D.races.find(r => r.round === activeRound) ?? D.races[0];
   const [lap, setLap] = useState(47);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [selectedCode, setSelectedCode] = useState('VER');
@@ -86,7 +99,7 @@ export default function App() {
         <main className="canvas">
           <header className="canvas-head">
             <div className="title">
-              <span className="eb">2023 · ROUND {String(race.round).padStart(2,'0')} · {race.country}</span>
+              <span className="eb">2023 · ROUND {String(race.round).padStart(2, '0')} · {race.country}</span>
               <span className="nm">{race.name.toUpperCase()} — RACE</span>
             </div>
             <div className="meta">
@@ -96,23 +109,23 @@ export default function App() {
             </div>
           </header>
 
-          <Scrubber totalLaps={race.laps} lap={lap} onChange={setLap}/>
+          <Scrubber totalLaps={race.laps} lap={lap} onChange={setLap} />
 
-          <StatGrid leader={leader}/>
+          <StatGrid leader={leader} />
 
           <Classification
             results={D.results} drivers={D.drivers}
-            selectedCode={selectedCode} onSelect={setSelectedCode}/>
+            selectedCode={selectedCode} onSelect={setSelectedCode} />
 
           <LapChart
             results={D.results} drivers={D.drivers}
             totalLaps={race.laps} currentLap={lap}
-            selectedCode={selectedCode}/>
+            selectedCode={selectedCode} />
 
           <TyreStrategy
             results={D.results} drivers={D.drivers}
             totalLaps={race.laps}
-            selectedCode={selectedCode} onSelect={setSelectedCode}/>
+            selectedCode={selectedCode} onSelect={setSelectedCode} />
         </main>
       </div>
 
@@ -125,4 +138,4 @@ export default function App() {
       )}
     </div>
   );
-};
+}

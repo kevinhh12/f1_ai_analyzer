@@ -1,7 +1,43 @@
+export type TyreCompound = 'S' | 'M' | 'H' | 'I' | 'W';
+
+export interface Race {
+  round: number;
+  name: string;
+  date: string;
+  country: string;
+  laps: number;
+  featured?: boolean;
+}
+
+export interface Driver {
+  num: string;
+  code: string;
+  name: string;
+  team: string;
+  color: string;
+}
+
+export interface Result {
+  pos: number;
+  num: string;
+  code: string;
+  name?: string;
+  best: string;
+  gap: string;
+  tyres: TyreCompound[];
+  stops: number;
+}
+
+export interface F1Data {
+  season: number;
+  races: Race[];
+  drivers: Driver[];
+  results: Result[];
+}
+
 // Tiny stand-in dataset for the F1 Analyzer UI kit demo.
-// Real app pulls from /races, /drivers, /laps, /position via the FastAPI backend
-// (see reference/ for endpoint definitions). This is shaped the same way.
-export const F1_DATA = {
+// Real app pulls from /races, /drivers, /laps, /position via the FastAPI backend.
+export const F1_DATA: F1Data = {
   season: 2023,
   races: [
     { round: 1,  name: 'Bahrain GP',     date: '05 MAR', country: 'BH', laps: 57 },
@@ -32,7 +68,7 @@ export const F1_DATA = {
     { pos: 2,  num: '14', code: 'ALO', best: '1:14.586', gap: '+27.921',  tyres: ['M','M'],     stops: 1 },
     { pos: 3,  num: '44', code: 'HAM', best: '1:14.771', gap: '+33.531',  tyres: ['M','I','M'], stops: 2 },
     { pos: 4,  num: '63', code: 'RUS', best: '1:14.882', gap: '+34.668',  tyres: ['M','I','M'], stops: 2 },
-    { pos: 5,  name: 'OCO', num: '31', code: 'OCO', best: '1:14.998', gap: '+38.211', tyres: ['M','I','M'], stops: 2 },
+    { pos: 5,  num: '31', code: 'OCO', best: '1:14.998', gap: '+38.211',  tyres: ['M','I','M'], stops: 2 },
     { pos: 6,  num: '16', code: 'LEC', best: '1:14.412', gap: '+39.426',  tyres: ['M','I','M'], stops: 2 },
     { pos: 7,  num: '55', code: 'SAI', best: '1:15.001', gap: '+45.995',  tyres: ['M','I','M'], stops: 2 },
     { pos: 8,  num: '04', code: 'NOR', best: '1:15.115', gap: '+47.021',  tyres: ['M','I','M'], stops: 2 },

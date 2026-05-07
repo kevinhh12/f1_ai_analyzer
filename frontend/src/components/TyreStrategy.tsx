@@ -1,12 +1,38 @@
-// Tyre strategy — horizontal stint bars per driver (Gantt-style)
-const TYRE_COLORS = { S:'#ff2e2e', M:'#ffd400', H:'#f3f3f3', I:'#00d27a', W:'#2bb6ff' };
-const TYRE_NAMES  = { S:'SOFT',    M:'MEDIUM', H:'HARD',    I:'INTER',   W:'WET' };
+import { type Driver, type Result, type TyreCompound } from '../data';
 
-export default function TyreStrategy({ results, drivers, totalLaps, selectedCode, onSelect }) {
+const TYRE_COLORS: Record<TyreCompound, string> = {
+  S: '#ff2e2e',
+  M: '#ffd400',
+  H: '#f3f3f3',
+  I: '#00d27a',
+  W: '#2bb6ff',
+};
+const TYRE_NAMES: Record<TyreCompound, string> = {
+  S: 'SOFT',
+  M: 'MEDIUM',
+  H: 'HARD',
+  I: 'INTER',
+  W: 'WET',
+};
+
+interface Stint {
+  t: TyreCompound;
+  len: number;
+}
+
+interface Props {
+  results: Result[];
+  drivers: Driver[];
+  totalLaps: number;
+  selectedCode: string;
+  onSelect: (code: string) => void;
+}
+
+// Tyre strategy — horizontal stint bars per driver (Gantt-style)
+export default function TyreStrategy({ results, drivers, totalLaps, selectedCode, onSelect }: Props) {
   const byCode = Object.fromEntries(drivers.map(d => [d.code, d]));
 
-  // Synth stint lengths per driver from their tyres array (totals to ~totalLaps)
-  function stints(tyres) {
+  function stints(tyres: TyreCompound[]): Stint[] {
     const base = Math.floor(totalLaps / tyres.length);
     let used = 0;
     return tyres.map((t, i) => {
@@ -24,7 +50,7 @@ export default function TyreStrategy({ results, drivers, totalLaps, selectedCode
       </div>
       <div className="strat">
         {results.slice(0, 8).map(r => {
-          const d = byCode[r.code] || { team:'—', color:'#9ea2ac', name:'' };
+          const d = byCode[r.code] ?? { team: '—', color: '#9ea2ac', name: '', num: r.num, code: r.code };
           const sel = r.code === selectedCode;
           const segs = stints(r.tyres);
           return (
@@ -32,7 +58,7 @@ export default function TyreStrategy({ results, drivers, totalLaps, selectedCode
                     className={"strat-row" + (sel ? " sel" : "")}
                     onClick={() => onSelect(r.code)}>
               <span className="strat-pos">P{r.pos}</span>
-              <span className="strat-team" style={{background: d.color}} />
+              <span className="strat-team" style={{ background: d.color }} />
               <span className="strat-code">{r.code}</span>
               <span className="strat-bar">
                 {segs.map((s, i) => (
@@ -53,13 +79,13 @@ export default function TyreStrategy({ results, drivers, totalLaps, selectedCode
         })}
       </div>
       <div className="strat-legend">
-        {['S','M','H','I','W'].map(t => (
+        {(['S', 'M', 'H', 'I', 'W'] as TyreCompound[]).map(t => (
           <span key={t} className="legend-item">
-            <span className="legend-dot" style={{borderColor: TYRE_COLORS[t]}} />
+            <span className="legend-dot" style={{ borderColor: TYRE_COLORS[t] }} />
             {TYRE_NAMES[t]}
           </span>
         ))}
       </div>
     </section>
   );
-};
+}

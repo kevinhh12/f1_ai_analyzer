@@ -1,5 +1,13 @@
+import { type Race } from '../data';
+
+interface Props {
+  races: Race[];
+  activeRound: number;
+  onPick: (race: Race) => void;
+}
+
 // Left rail — race list with the focused race highlighted.
-export default function Sidebar({ races, activeRound, onPick }) {
+export default function Sidebar({ races, activeRound, onPick }: Props) {
   return (
     <aside className="sidebar">
       <div className="rail-eb">2023 SEASON</div>
@@ -10,14 +18,14 @@ export default function Sidebar({ races, activeRound, onPick }) {
             className={"rail-item" + (r.round === activeRound ? " active" : "")}
             onClick={() => onPick(r)}
           >
-            <span className="rd">R{String(r.round).padStart(2,'0')}</span>
+            <span className="rd">R{String(r.round).padStart(2, '0')}</span>
             <span className="nm">{r.name}</span>
             <span className="dt">{r.date}</span>
           </button>
         ))}
       </div>
 
-      <div className="rail-eb" style={{marginTop:24}}>VIEWS</div>
+      <div className="rail-eb" style={{ marginTop: 24 }}>VIEWS</div>
       <div className="rail-views">
         <button className="rail-view active">CLASSIFICATION</button>
         <button className="rail-view">LAP CHART</button>
@@ -27,4 +35,4 @@ export default function Sidebar({ races, activeRound, onPick }) {
       </div>
     </aside>
   );
-};
+}
