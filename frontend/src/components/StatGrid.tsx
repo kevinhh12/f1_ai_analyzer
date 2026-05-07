@@ -1,8 +1,13 @@
-// Three stat tiles + a tyre legend chip row.
-export default function StatGrid({ leader }) {
+import { type Result } from '../data';
+
+interface Props {
+  leader: Result;
+}
+
+export default function StatGrid({ leader }: Props) {
   return (
     <div className="stat-grid">
-      <div className="stat-card" style={{borderLeftColor:'#3671c6'}}>
+      <div className="stat-card" style={{ borderLeftColor: '#3671c6' }}>
         <div className="stat-lbl">FASTEST LAP</div>
         <div className="stat-row">
           <div className="stat-v">1:14.260</div>
@@ -30,4 +35,4 @@ export default function StatGrid({ leader }) {
       </div>
     </div>
   );
-};
+}

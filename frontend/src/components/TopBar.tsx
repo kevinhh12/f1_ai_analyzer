@@ -1,19 +1,26 @@
-// Top bar: brand mark + live session pill + lap counter.
-// Sticky, backdrop-blurred — drops a shadow once content scrolls beneath.
-export default function TopBar({ race, currentLap, totalLaps, onChangeRace }) {
+import { type Race } from '../data';
+
+interface Props {
+  race: Race;
+  currentLap: number;
+  totalLaps: number;
+  onChangeRace: () => void;
+}
+
+export default function TopBar({ race, currentLap, totalLaps, onChangeRace }: Props) {
   return (
     <header className="topbar">
       <div className="brand">
         <div className="mark">F1</div>
         <div className="wm">
-          <span>F1</span><span style={{color:'#e10600'}}>ANALYZER</span>
+          <span>F1</span><span style={{ color: '#e10600' }}>ANALYZER</span>
         </div>
       </div>
 
       <div className="topbar-divider" />
 
       <button className="race-button" onClick={onChangeRace}>
-        <span className="eb">2023 · ROUND {String(race.round).padStart(2,'0')}</span>
+        <span className="eb">2023 · ROUND {String(race.round).padStart(2, '0')}</span>
         <span className="nm">{race.name.toUpperCase()}</span>
       </button>
 
@@ -29,4 +36,4 @@ export default function TopBar({ race, currentLap, totalLaps, onChangeRace }) {
       </div>
     </header>
   );
-};
+}
