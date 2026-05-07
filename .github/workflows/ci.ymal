@@ -29,22 +29,22 @@ jobs:
         run: npm run build
 
   backend:
-    name: Backend Check
+    name: Backend Tests
     runs-on: ubuntu-latest
 
     steps:
       - name: Get code from repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Set up Python        # ← Python, not Node
+        uses: actions/setup-python@v5
         with:
-          node-version: 20
+          python-version: '3.11'
 
-      - name: Install backend dependencies
+      - name: Install dependencies
         working-directory: backend
-        run: npm install
+        run: pip install -r requirements.txt
 
-      - name: Run backend tests if available
+      - name: Run tests
         working-directory: backend
-        run: npm test --if-present
+        run: pytest test/ -v
