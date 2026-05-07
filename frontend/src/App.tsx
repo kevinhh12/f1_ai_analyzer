@@ -1,122 +1,141 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useState, useEffect } from 'react';
+import './styles.css';
+import { F1_DATA, type Race } from './data';
+import Classification from './components/Classification';
+import LapChart from './components/LapChart';
+import StatGrid from './components/StatGrid';
+import TopBar from './components/TopBar';
+import TyreStrategy from './components/TyreStrategy';
+import Sidebar from './components/Sidebar';
 
-function App() {
-  const [count, setCount] = useState(0)
-
-  return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+interface ScrubberProps {
+  totalLaps: number;
+  lap: number;
+  onChange: React.Dispatch<React.SetStateAction<number>>;
 }
 
-export default App
+function Scrubber({ totalLaps, lap, onChange }: ScrubberProps) {
+  const [playing, setPlaying] = useState(false);
+  useEffect(() => {
+    if (!playing) return;
+    const id = setInterval(() => {
+      onChange(l => l >= totalLaps ? 1 : l + 1);
+    }, 250);
+    return () => clearInterval(id);
+  }, [playing, totalLaps, onChange]);
+
+  return (
+    <div className="scrubber">
+      <button className="play" onClick={() => setPlaying(p => !p)} title={playing ? 'Pause' : 'Play'}>
+        {playing ? '❚❚' : '▶'}
+      </button>
+      <span className="lap-lbl">LAP</span>
+      <input type="range" min="1" max={totalLaps} value={lap}
+             onChange={e => onChange(Number(e.target.value))} />
+      <span className="lap-v">{lap}/{totalLaps}</span>
+    </div>
+  );
+}
+
+interface RacePickerProps {
+  races: Race[];
+  activeRound: number;
+  onPick: (race: Race) => void;
+  onClose: () => void;
+}
+
+function RacePicker({ races, activeRound, onPick, onClose }: RacePickerProps) {
+  return (
+    <div className="scrim" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-head">
+          <div className="t">SELECT RACE · 2023</div>
+          <button className="x" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-list">
+          {races.map(r => (
+            <button key={r.round}
+                    className={"modal-row" + (r.round === activeRound ? " active" : "")}
+                    onClick={() => { onPick(r); onClose(); }}>
+              <span className="rd">R{String(r.round).padStart(2, '0')}</span>
+              <span className="nm">{r.name}</span>
+              <span className="dt">{r.date}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  const D = F1_DATA;
+  const [activeRound, setActiveRound] = useState(6);
+  const race = D.races.find(r => r.round === activeRound) ?? D.races[0];
+  const [lap, setLap] = useState(47);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [selectedCode, setSelectedCode] = useState('VER');
+
+  useEffect(() => {
+    if (lap > race.laps) setLap(Math.min(lap, race.laps));
+  }, [race.laps]);
+
+  const leader = D.results[0];
+
+  return (
+    <div className="app">
+      <TopBar
+        race={race}
+        currentLap={lap}
+        totalLaps={race.laps}
+        onChangeRace={() => setPickerOpen(true)}
+      />
+      <div className="shell">
+        <Sidebar
+          races={D.races}
+          activeRound={activeRound}
+          onPick={r => setActiveRound(r.round)}
+        />
+        <main className="canvas">
+          <header className="canvas-head">
+            <div className="title">
+              <span className="eb">2023 · ROUND {String(race.round).padStart(2, '0')} · {race.country}</span>
+              <span className="nm">{race.name.toUpperCase()} — RACE</span>
+            </div>
+            <div className="meta">
+              <div className="item"><span className="lbl">DISTANCE</span><span className="v">{race.laps} LAPS</span></div>
+              <div className="item"><span className="lbl">WINNER</span><span className="v" style={{color:'#e10600'}}>VER</span></div>
+              <div className="item"><span className="lbl">FASTEST</span><span className="v">1:14.260</span></div>
+            </div>
+          </header>
+
+          <Scrubber totalLaps={race.laps} lap={lap} onChange={setLap} />
+
+          <StatGrid leader={leader} />
+
+          <Classification
+            results={D.results} drivers={D.drivers}
+            selectedCode={selectedCode} onSelect={setSelectedCode} />
+
+          <LapChart
+            results={D.results} drivers={D.drivers}
+            totalLaps={race.laps} currentLap={lap}
+            selectedCode={selectedCode} />
+
+          <TyreStrategy
+            results={D.results} drivers={D.drivers}
+            totalLaps={race.laps}
+            selectedCode={selectedCode} onSelect={setSelectedCode} />
+        </main>
+      </div>
+
+      {pickerOpen && (
+        <RacePicker
+          races={D.races} activeRound={activeRound}
+          onPick={r => setActiveRound(r.round)}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
