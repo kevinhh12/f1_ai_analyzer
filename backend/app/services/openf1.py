@@ -10,6 +10,7 @@ Caching strategy:
   Later: swap in Redis by changing only this file; routers stay untouched
 """
 
+import time
 import httpx
 from functools import lru_cache
 
@@ -20,10 +21,19 @@ def _get(endpoint: str, params: dict) -> list:
     """
     Single HTTP entry point for all requests.
     Adding Redis caching later only requires changing this function.
+    - 404: OpenF1 returns this when a session has no data — treat as empty.
+    - 429: OpenF1 rate limit hit — retry up to 3 times with increasing delays.
     """
-    response = httpx.get(f"{BASE}/{endpoint}", params=params, timeout=30.0)
-    response.raise_for_status()
-    return response.json()
+    for attempt in range(3):
+        response = httpx.get(f"{BASE}/{endpoint}", params=params, timeout=30.0)
+        if response.status_code == 404:
+            return []
+        if response.status_code == 429:
+            time.sleep(attempt + 1)
+            continue
+        response.raise_for_status()
+        return response.json()
+    raise Exception(f"OpenF1 rate limit exceeded after 3 retries for /{endpoint}")
 
 
 @lru_cache(maxsize=64)
@@ -49,13 +59,22 @@ def get_session_key(season: int, circuit: str) -> int:
 @lru_cache(maxsize=16)
 def get_races(season: int) -> list[dict]:
     """
-    Returns all race sessions for a given season.
+    Returns all race sessions for a given season, shaped for the frontend.
+    Each item includes session_key so the frontend can fetch laps/tyres/etc.
     Route: GET /races?season=2023
     """
-    return _get("sessions", {
-        "year": season,
-        "session_name": "Race",
-    })
+    sessions = _get("sessions", {"year": season, "session_name": "Race"})
+    sorted_sessions = sorted(sessions, key=lambda s: s.get("date_start", ""))
+    return [
+        {
+            "session_key": s["session_key"],
+            "round":       i + 1,
+            "name":        s.get("meeting_name") or s.get("circuit_short_name", "Unknown GP"),
+            "date":        s.get("date_start", ""),
+            "country":     (s.get("country_code") or "??")[:2],
+        }
+        for i, s in enumerate(sorted_sessions)
+    ]
 
 
 @lru_cache(maxsize=32)

@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type Dispatch, type SetStateAction } from 'react';
 import './styles.css';
-import { F1_DATA, type Race } from './data';
+import { type Race, type Driver, type Result } from './data';
+import { fetchRaces, fetchRaceData } from './api';
 import Classification from './components/Classification';
 import LapChart from './components/LapChart';
 import StatGrid from './components/StatGrid';
@@ -11,7 +12,7 @@ import Sidebar from './components/Sidebar';
 interface ScrubberProps {
   totalLaps: number;
   lap: number;
-  onChange: React.Dispatch<React.SetStateAction<number>>;
+  onChange: Dispatch<SetStateAction<number>>;
 }
 
 function Scrubber({ totalLaps, lap, onChange }: ScrubberProps) {
@@ -30,9 +31,9 @@ function Scrubber({ totalLaps, lap, onChange }: ScrubberProps) {
         {playing ? '❚❚' : '▶'}
       </button>
       <span className="lap-lbl">LAP</span>
-      <input type="range" min="1" max={totalLaps} value={lap}
+      <input type="range" min="1" max={totalLaps || 1} value={lap}
              onChange={e => onChange(Number(e.target.value))} />
-      <span className="lap-v">{lap}/{totalLaps}</span>
+      <span className="lap-v">{lap}/{totalLaps || '—'}</span>
     </div>
   );
 }
@@ -69,69 +70,122 @@ function RacePicker({ races, activeRound, onPick, onClose }: RacePickerProps) {
 }
 
 export default function App() {
-  const D = F1_DATA;
-  const [activeRound, setActiveRound] = useState(6);
-  const race = D.races.find(r => r.round === activeRound) ?? D.races[0];
-  const [lap, setLap] = useState(47);
+  const [races, setRaces]           = useState<Race[]>([]);
+  const [activeRound, setActiveRound] = useState(1);
+  const [drivers, setDrivers]       = useState<Driver[]>([]);
+  const [results, setResults]       = useState<Result[]>([]);
+  const [totalLaps, setTotalLaps]   = useState(0);
+  const [lap, setLap]               = useState(1);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [selectedCode, setSelectedCode] = useState('VER');
+  const [selectedCode, setSelectedCode] = useState('');
+  const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState<string | null>(null);
 
+  // Load the race list once on mount
   useEffect(() => {
-    if (lap > race.laps) setLap(Math.min(lap, race.laps));
-  }, [race.laps]);
+    fetchRaces(2023)
+      .then(r => {
+        setRaces(r);
+        setActiveRound(r[0]?.round ?? 1);
+      })
+      .catch(e => setError(e.message));
+  }, []);
 
-  const leader = D.results[0];
+  const race = races.find(r => r.round === activeRound) ?? races[0];
+
+  // Load lap/tyre/driver data whenever the selected race changes
+  useEffect(() => {
+    if (!race?.session_key) return;
+    setLoading(true);
+    setError(null);
+    fetchRaceData(race.session_key)
+      .then(({ drivers, results, totalLaps }) => {
+        setDrivers(drivers);
+        setResults(results);
+        setTotalLaps(totalLaps);
+        setLap(1);
+        setSelectedCode(results[0]?.code ?? '');
+        // Patch total laps back into the race list so the scrubber is accurate
+        setRaces(prev => prev.map(r =>
+          r.round === race.round ? { ...r, laps: totalLaps } : r
+        ));
+      })
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false));
+  }, [race?.session_key]);
+
+  if (error) {
+    return (
+      <div className="app" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+        <div style={{ textAlign: 'center', color: '#e10600' }}>
+          <div style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: 8 }}>Failed to load data</div>
+          <div style={{ color: '#9ea2ac', fontSize: '0.85rem' }}>{error}</div>
+          <div style={{ color: '#6a6e78', fontSize: '0.75rem', marginTop: 8 }}>Is the backend running on port 8000?</div>
+        </div>
+      </div>
+    );
+  }
+
+  const leader = results[0];
 
   return (
     <div className="app">
       <TopBar
-        race={race}
+        race={race ?? { session_key: 0, round: 1, name: '—', date: '—', country: '—', laps: 0 }}
         currentLap={lap}
-        totalLaps={race.laps}
+        totalLaps={totalLaps}
         onChangeRace={() => setPickerOpen(true)}
       />
       <div className="shell">
         <Sidebar
-          races={D.races}
+          races={races}
           activeRound={activeRound}
           onPick={r => setActiveRound(r.round)}
         />
         <main className="canvas">
           <header className="canvas-head">
             <div className="title">
-              <span className="eb">2023 · ROUND {String(race.round).padStart(2, '0')} · {race.country}</span>
-              <span className="nm">{race.name.toUpperCase()} — RACE</span>
+              <span className="eb">2023 · ROUND {String(race?.round ?? 1).padStart(2, '0')} · {race?.country ?? '—'}</span>
+              <span className="nm">{(race?.name ?? '—').toUpperCase()} — RACE</span>
             </div>
             <div className="meta">
-              <div className="item"><span className="lbl">DISTANCE</span><span className="v">{race.laps} LAPS</span></div>
-              <div className="item"><span className="lbl">WINNER</span><span className="v" style={{color:'#e10600'}}>VER</span></div>
-              <div className="item"><span className="lbl">FASTEST</span><span className="v">1:14.260</span></div>
+              <div className="item"><span className="lbl">DISTANCE</span><span className="v">{totalLaps || '—'} LAPS</span></div>
+              <div className="item"><span className="lbl">WINNER</span><span className="v" style={{ color: '#e10600' }}>{leader?.code ?? '—'}</span></div>
+              <div className="item"><span className="lbl">FASTEST</span><span className="v">{leader?.best ?? '—'}</span></div>
             </div>
           </header>
 
-          <Scrubber totalLaps={race.laps} lap={lap} onChange={setLap} />
+          {loading ? (
+            <div style={{ padding: '48px', textAlign: 'center', color: '#6a6e78' }}>
+              Loading race data...
+            </div>
+          ) : (
+            <>
+              <Scrubber totalLaps={totalLaps} lap={lap} onChange={setLap} />
 
-          <StatGrid leader={leader} />
+              {leader && <StatGrid leader={leader} />}
 
-          <Classification
-            results={D.results} drivers={D.drivers}
-            selectedCode={selectedCode} onSelect={setSelectedCode} />
+              <Classification
+                results={results} drivers={drivers}
+                selectedCode={selectedCode} onSelect={setSelectedCode} />
 
-          <LapChart
-            results={D.results} drivers={D.drivers}
-            totalLaps={race.laps} currentLap={lap}
-            selectedCode={selectedCode} />
+              <LapChart
+                results={results} drivers={drivers}
+                totalLaps={totalLaps || 1} currentLap={lap}
+                selectedCode={selectedCode} />
 
-          <TyreStrategy
-            results={D.results} drivers={D.drivers}
-            totalLaps={race.laps}
-            selectedCode={selectedCode} onSelect={setSelectedCode} />
+              <TyreStrategy
+                results={results} drivers={drivers}
+                totalLaps={totalLaps || 1}
+                selectedCode={selectedCode} onSelect={setSelectedCode} />
+            </>
+          )}
         </main>
       </div>
 
-      {pickerOpen && (
+      {pickerOpen && races.length > 0 && (
         <RacePicker
-          races={D.races} activeRound={activeRound}
+          races={races} activeRound={activeRound}
           onPick={r => setActiveRound(r.round)}
           onClose={() => setPickerOpen(false)}
         />

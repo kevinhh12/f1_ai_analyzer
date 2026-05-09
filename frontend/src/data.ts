@@ -1,6 +1,7 @@
 export type TyreCompound = 'S' | 'M' | 'H' | 'I' | 'W';
 
 export interface Race {
+  session_key?: number;
   round: number;
   name: string;
   date: string;

@@ -13,7 +13,7 @@ export default function LapChart({ results, drivers, selectedCode, totalLaps, cu
   const W = 880, H = 300, PAD = { l: 40, r: 16, t: 12, b: 32 };
   const innerW = W - PAD.l - PAD.r;
   const innerH = H - PAD.t - PAD.b;
-  const N = totalLaps;
+  const N = Math.max(totalLaps, 2);
   const POS = 10;
 
   function hash(s: string, n: number): number {
