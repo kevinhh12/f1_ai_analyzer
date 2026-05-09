@@ -1,6 +1,7 @@
 export type TyreCompound = 'S' | 'M' | 'H' | 'I' | 'W';
 
 export interface Race {
+  year: number;
   round: number;
   name: string;
   date: string;
@@ -40,15 +41,15 @@ export interface F1Data {
 export const F1_DATA: F1Data = {
   season: 2023,
   races: [
-    { round: 1,  name: 'Bahrain GP',     date: '05 MAR', country: 'BH', laps: 57 },
-    { round: 4,  name: 'Azerbaijan GP',  date: '30 APR', country: 'AZ', laps: 51 },
-    { round: 5,  name: 'Miami GP',       date: '07 MAY', country: 'US', laps: 57 },
-    { round: 6,  name: 'Monaco GP',      date: '28 MAY', country: 'MC', laps: 78, featured: true },
-    { round: 7,  name: 'Spanish GP',     date: '04 JUN', country: 'ES', laps: 66 },
-    { round: 9,  name: 'Austrian GP',    date: '02 JUL', country: 'AT', laps: 71 },
-    { round: 10, name: 'British GP',     date: '09 JUL', country: 'GB', laps: 52 },
-    { round: 14, name: 'Dutch GP',       date: '27 AUG', country: 'NL', laps: 72 },
-    { round: 15, name: 'Italian GP',     date: '03 SEP', country: 'IT', laps: 53 },
+    { year: 2023, round: 1,  name: 'Bahrain GP',     date: '05 MAR', country: 'BH', laps: 57 },
+    { year: 2023, round: 4,  name: 'Azerbaijan GP',  date: '30 APR', country: 'AZ', laps: 51 },
+    { year: 2023, round: 5,  name: 'Miami GP',       date: '07 MAY', country: 'US', laps: 57 },
+    { year: 2023, round: 6,  name: 'Monaco GP',      date: '28 MAY', country: 'MC', laps: 78, featured: true },
+    { year: 2023, round: 7,  name: 'Spanish GP',     date: '04 JUN', country: 'ES', laps: 66 },
+    { year: 2023, round: 9,  name: 'Austrian GP',    date: '02 JUL', country: 'AT', laps: 71 },
+    { year: 2023, round: 10, name: 'British GP',     date: '09 JUL', country: 'GB', laps: 52 },
+    { year: 2023, round: 14, name: 'Dutch GP',       date: '27 AUG', country: 'NL', laps: 72 },
+    { year: 2023, round: 15, name: 'Italian GP',     date: '03 SEP', country: 'IT', laps: 53 },
   ],
   drivers: [
     { num: '01', code: 'VER', name: 'Verstappen',  team: 'Red Bull',     color: '#3671c6' },
