@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import './styles.css';
+import './css/styles.css';
 import { F1_DATA, type Race } from './data';
 import Classification from './components/Classification';
 import LapChart from './components/LapChart';
