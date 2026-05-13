@@ -907,12 +907,18 @@ body {
 
 .race-button .eb {
   font: 600 9px/1 var(--font-sans);
+  display: flex;
+  justify-content: center;
+  align-items: center;
   letter-spacing: .18em;
   text-transform: uppercase;
   color: var(--fg-subtle);
 }
 
 .race-button .nm {
+  display: flex;
+  width: 100% ;
+  justify-content: space-between;
   font: 700 14px/1 var(--font-display);
   letter-spacing: .04em;
   text-transform: uppercase;
@@ -1042,6 +1048,7 @@ body {
 }
 
 .rail-item .nm {
+  
   font: 500 12px var(--font-sans);
   color: var(--fg-muted);
 }

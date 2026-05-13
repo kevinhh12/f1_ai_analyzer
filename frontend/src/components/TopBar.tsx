@@ -47,8 +47,10 @@ export default function TopBar({ race, currentLap, totalLaps, onChangeRace, race
       <div className="race-dropdown-wrap" ref={ref}>
         <button className="race-button" onClick={handleOpen}>
           <span className="eb">{String(race.year)} · ROUND {String(race.round).padStart(2, '0')}</span>
-          <span className="nm">{race.name.toUpperCase()}</span>
-          <span className="eb" style={{ marginLeft: 6, opacity: 0.5 }}>{open ? '▲' : '▼'}</span>
+          <span className="nm">{race.name.toUpperCase()} 
+            <span className="eb" >{open ? '▲' : '▼'}</span>
+          </span>
+          
         </button>
 
         {open && (
