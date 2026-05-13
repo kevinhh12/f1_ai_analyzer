@@ -907,12 +907,18 @@ body {
 
 .race-button .eb {
   font: 600 9px/1 var(--font-sans);
+  display: flex;
+  justify-content: center;
+  align-items: center;
   letter-spacing: .18em;
   text-transform: uppercase;
   color: var(--fg-subtle);
 }
 
 .race-button .nm {
+  display: flex;
+  width: 100% ;
+  justify-content: space-between;
   font: 700 14px/1 var(--font-display);
   letter-spacing: .04em;
   text-transform: uppercase;
@@ -1042,6 +1048,7 @@ body {
 }
 
 .rail-item .nm {
+  
   font: 500 12px var(--font-sans);
   color: var(--fg-muted);
 }
@@ -1571,96 +1578,167 @@ body {
   text-align: right;
 }
 
-/* ---------- RACE PICKER MODAL ---------- */
 
-.scrim {
-  position: fixed;
-  inset: 0;
-  background: rgba(10,11,13,.7);
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 100px;
-  z-index: 100;
+/* ---------- RACE DROPDOWN ---------- */
+
+.race-dropdown-wrap {
+  position: relative;
 }
 
-.modal {
-  width: 520px;
-  max-width: calc(100vw - 40px);
+.race-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
   background: var(--bg-elevated);
   border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  box-shadow: var(--shadow-lg);
+  border-radius: var(--radius-lg);
+  min-width: 280px;
+  z-index: 100;
   overflow: hidden;
+  box-shadow: var(--shadow-lg);
 }
 
-.modal-head {
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--border);
+.dropdown-years {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
 }
 
-.modal-head .t {
-  font: 700 14px var(--font-display);
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--fg);
-}
-
-.modal-head .x {
-  background: transparent;
+.dropdown-year {
+  flex: 1;
+  padding: 10px;
+  background: none;
   border: none;
-  color: var(--fg-faint);
-  cursor: pointer;
-  font-size: 18px;
-  line-height: 1;
-}
-
-.modal-list {
-  max-height: 340px;
-  overflow: auto;
-  padding: 6px 0;
-}
-
-.modal-row {
-  width: 100%;
-  display: grid;
-  grid-template-columns: 50px 1fr 70px;
-  gap: 12px;
-  align-items: center;
-  padding: 9px 18px;
-  background: transparent;
-  border: none;
-  text-align: left;
-  cursor: pointer;
-  transition: background 120ms var(--ease-out);
-}
-
-.modal-row:hover {
-  background: var(--bg-raised);
-}
-
-.modal-row.active {
-  background: rgba(225,6,0,.10);
-}
-
-.modal-row .rd {
-  font: 700 11px var(--font-mono);
   color: var(--fg-subtle);
+  cursor: pointer;
+  font: 600 11px var(--font-sans);
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  transition: background var(--dur-fast) var(--ease-out);
 }
 
-.modal-row .nm {
-  font: 500 14px var(--font-sans);
+.dropdown-year:hover {
+  background: var(--bg-raised);
+  color: var(--fg-muted);
+}
+
+.dropdown-year.active {
+  color: var(--fg);
+  background: var(--accent);
+}
+
+.dropdown-races {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.dropdown-row {
+  display: grid;
+  grid-template-columns: 36px 1fr 56px;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 14px;
+  background: none;
+  border: none;
+  color: var(--fg-muted);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.dropdown-row:hover {
+  background: var(--bg-raised);
   color: var(--fg);
 }
 
-.modal-row .dt {
-  font: 400 11px var(--font-mono);
+.dropdown-row.active {
+  background: rgba(225, 6, 0, .10);
+  color: var(--fg);
+}
+
+.dropdown-row .rd {
+  font: 700 10px var(--font-mono);
+  color: var(--fg-faint);
+}
+
+.dropdown-row.active .rd {
+  color: #ff6b6b;
+}
+
+.dropdown-row .nm {
+  font: 500 13px var(--font-sans);
+}
+
+.dropdown-row .dt {
+  font: 400 10px var(--font-mono);
   color: var(--fg-faint);
   text-align: right;
 }
+.dropdown-years-only {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0;
+}
+
+.dropdown-step-label {
+  font: 600 9px var(--font-sans);
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  padding: 10px 14px 6px;
+}
+
+.dropdown-year-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 14px;
+  background: none;
+  border: none;
+  color: var(--fg-muted);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.dropdown-year-row:hover {
+  background: var(--bg-raised);
+  color: var(--fg);
+}
+
+.dropdown-year-row .yr {
+  font: 700 16px var(--font-display);
+  letter-spacing: .04em;
+}
+
+.dropdown-year-row .arr {
+  font-size: 18px;
+  color: var(--fg-faint);
+}
+
+.dropdown-back {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--fg-subtle);
+  cursor: pointer;
+  font: 700 11px var(--font-sans);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.dropdown-back:hover {
+  background: var(--bg-raised);
+  color: var(--fg);
+}
+
 
 /* ---------- RESPONSIVE ---------- */
 
