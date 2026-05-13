@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import './css/styles.css';
-import { F1_DATA, type Race } from './data';
+import { F1_DATA } from './data';
 import Classification from './components/Classification';
 import LapChart from './components/LapChart';
 import StatGrid from './components/StatGrid';
@@ -37,43 +37,13 @@ function Scrubber({ totalLaps, lap, onChange }: ScrubberProps) {
   );
 }
 
-interface RacePickerProps {
-  races: Race[];
-  activeRound: number;
-  onPick: (race: Race) => void;
-  onClose: () => void;
-}
-
-function RacePicker({ races, activeRound, onPick, onClose }: RacePickerProps) {
-  return (
-    <div className="scrim" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
-        <div className="modal-head">
-          <div className="t">SELECT RACE · 2023</div>
-          <button className="x" onClick={onClose}>✕</button>
-        </div>
-        <div className="modal-list">
-          {races.map(r => (
-            <button key={r.round}
-                    className={"modal-row" + (r.round === activeRound ? " active" : "")}
-                    onClick={() => { onPick(r); onClose(); }}>
-              <span className="rd">R{String(r.round).padStart(2, '0')}</span>
-              <span className="nm">{r.name}</span>
-              <span className="dt">{r.date}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function App() {
   const D = F1_DATA;
   const [activeRound, setActiveRound] = useState(6);
-  const race = D.races.find(r => r.round === activeRound) ?? D.races[0];
+  const latestYear = Math.max(...D.races.map(r => r.year));
+  const [activeYear, setActiveYear] = useState(latestYear);
+  const race = D.races.find(r => r.round === activeRound && r.year === activeYear) ?? D.races[0];
   const [lap, setLap] = useState(47);
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [selectedCode, setSelectedCode] = useState('VER');
 
   useEffect(() => {
@@ -88,18 +58,20 @@ export default function App() {
         race={race}
         currentLap={lap}
         totalLaps={race.laps}
-        onChangeRace={() => setPickerOpen(true)}
+        races={D.races}
+        onChangeRace={r => { setActiveRound(r.round); setActiveYear(r.year); }}
       />
       <div className="shell">
         <Sidebar
           races={D.races}
           activeRound={activeRound}
-          onPick={r => setActiveRound(r.round)}
+          activeYear={activeYear}
+          onPick={r => { setActiveRound(r.round); setActiveYear(r.year); }}
         />
         <main className="canvas">
           <header className="canvas-head">
             <div className="title">
-              <span className="eb">2023 · ROUND {String(race.round).padStart(2, '0')} · {race.country}</span>
+              <span className="eb">{activeYear} · ROUND {String(race.round).padStart(2, '0')} · {race.country}</span>
               <span className="nm">{race.name.toUpperCase()} — RACE</span>
             </div>
             <div className="meta">
@@ -110,32 +82,20 @@ export default function App() {
           </header>
 
           <Scrubber totalLaps={race.laps} lap={lap} onChange={setLap} />
-
           <StatGrid leader={leader} />
-
           <Classification
             results={D.results} drivers={D.drivers}
             selectedCode={selectedCode} onSelect={setSelectedCode} />
-
           <LapChart
             results={D.results} drivers={D.drivers}
             totalLaps={race.laps} currentLap={lap}
             selectedCode={selectedCode} />
-
           <TyreStrategy
             results={D.results} drivers={D.drivers}
             totalLaps={race.laps}
             selectedCode={selectedCode} onSelect={setSelectedCode} />
         </main>
       </div>
-
-      {pickerOpen && (
-        <RacePicker
-          races={D.races} activeRound={activeRound}
-          onPick={r => setActiveRound(r.round)}
-          onClose={() => setPickerOpen(false)}
-        />
-      )}
     </div>
   );
 }

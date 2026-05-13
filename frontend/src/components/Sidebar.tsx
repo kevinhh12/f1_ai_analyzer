@@ -3,19 +3,21 @@ import { type Race } from '../data';
 interface Props {
   races: Race[];
   activeRound: number;
+  activeYear: number;
   onPick: (race: Race) => void;
 }
 
-// Left rail — race list with the focused race highlighted.
-export default function Sidebar({ races, activeRound, onPick }: Props) {
+export default function Sidebar({ races, activeRound, activeYear, onPick }: Props) {
+  const filteredRaces = races.filter(r => r.year === activeYear);
+
   return (
     <aside className="sidebar">
-      <div className="rail-eb">2023 SEASON</div>
+      <div className="rail-eb">{activeYear} SEASON</div>
       <div className="rail-list">
-        {races.map(r => (
+        {filteredRaces.map(r => (
           <button
             key={r.round}
-            className={"rail-item" + (r.round === activeRound ? " active" : "")}
+            className={"rail-item" + (r.round === activeRound && r.year === activeYear ? " active" : "")}
             onClick={() => onPick(r)}
           >
             <span className="rd">R{String(r.round).padStart(2, '0')}</span>
