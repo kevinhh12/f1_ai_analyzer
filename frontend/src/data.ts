@@ -60,8 +60,8 @@ export const F1_DATA: F1Data = {
     { year: 2024, round: 15, name: 'Italian GP',      date: '01 SEP', country: 'IT', laps: 53 },
   ],
   drivers: [
-    { num: '01', code: 'VER', name: 'Verstappen',  team: 'Red Bull',     color: '#3671c6' },
-    { num: '11', code: 'PER', name: 'Pérez',       team: 'Red Bull',     color: '#3671c6' },
+    { num: '01', code: 'VER', name: 'Verstappen',  team: 'Red Bull Racing',     color: '#3671c6' },
+    { num: '11', code: 'PER', name: 'Pérez',       team: 'Red Bull Racing',     color: '#3671c6' },
     { num: '16', code: 'LEC', name: 'Leclerc',     team: 'Ferrari',      color: '#dc0000' },
     { num: '55', code: 'SAI', name: 'Sainz',       team: 'Ferrari',      color: '#dc0000' },
     { num: '44', code: 'HAM', name: 'Hamilton',    team: 'Mercedes',     color: '#27f4d2' },
@@ -70,6 +70,7 @@ export const F1_DATA: F1Data = {
     { num: '81', code: 'PIA', name: 'Piastri',     team: 'McLaren',      color: '#ff8000' },
     { num: '14', code: 'ALO', name: 'Alonso',      team: 'Aston Martin', color: '#229971' },
     { num: '23', code: 'ALB', name: 'Albon',       team: 'Williams',     color: '#64c4ff' },
+    { num: '31', code: 'OCO', name: 'Ocon',        team: 'Alpine',       color: '#0090ff' },
   ],
   results: [
     { pos: 1,  num: '01', code: 'VER', best: '1:14.260', gap: 'LEADER',  tyres: ['M','M'],     stops: 1 },

@@ -17,6 +17,7 @@ interface Props {
 
 export default function Classification({ results, drivers, selectedCode, onSelect }: Props) {
   const byCode = Object.fromEntries(drivers.map(d => [d.code, d]));
+  const teamLogoURL = (team: string) => `https://media.formula1.com/image/upload/c_lfill,w_48/q_auto/v1740000001/common/f1/2026/${team.toLowerCase().replace(/\s/g, '')}/2026${team.toLowerCase().replace(/\s/g, '')}logowhite.webp`;
   return (
     <section id="classification" className='panel'>
       <header className="cl-head">
@@ -46,7 +47,14 @@ export default function Classification({ results, drivers, selectedCode, onSelec
               <span className="cl-h drv">
                 <strong>{r.code}</strong> <span className="srn">{d.name}</span>
               </span>
-              <span className="cl-h tm" style={{ color: d.color }}>{d.team.toUpperCase()}</span>
+              <div className='teams'>
+                
+                <div className='logo-background' style={{ backgroundColor: d.color }}>
+                  <img className='logo' src={teamLogoURL(d.team)} alt={d.team} />
+                </div>
+                <span className="cl-h tm" style={{ color: d.color }}>{d.team.toUpperCase()}</span>
+              </div>
+              
               <span className="cl-h best">{r.best}</span>
               <span className="cl-h tyre">
                 {r.tyres.map((t, i) => (
