@@ -53,6 +53,13 @@ export default function Sidebar({ races, activeRound, activeYear, onPick }: Prop
 
       <div className="rail-views">
         <button
+          onClick={() => scrollToSection('summary')}
+          className={activeView === "summary" ? "rail-view active" : "rail-view"}
+        >
+          SUMMARY
+        </button>
+        
+        <button
           onClick={() => scrollToSection('classification')}
           className={activeView === "classification" ? "rail-view active" : "rail-view"}
         >

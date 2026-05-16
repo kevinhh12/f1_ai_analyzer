@@ -70,7 +70,7 @@ export default function App() {
         />
         <main className="canvas">
           <header className="canvas-head">
-            <div className="title">
+            <div id="summary" className="title">
               <span className="eb">{activeYear} · ROUND {String(race.round).padStart(2, '0')} · {race.country}</span>
               <span className="nm">{race.name.toUpperCase()} — RACE</span>
             </div>
