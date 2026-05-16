@@ -18,7 +18,7 @@ interface Props {
 export default function Classification({ results, drivers, selectedCode, onSelect }: Props) {
   const byCode = Object.fromEntries(drivers.map(d => [d.code, d]));
   return (
-    <section className="classification">
+    <section id="classification" className='panel'>
       <header className="cl-head">
         <span className="cl-h pos">POS</span>
         <span className="cl-h num">#</span>

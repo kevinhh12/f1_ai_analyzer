@@ -47,7 +47,7 @@ export default function LapChart({ results, drivers, selectedCode, totalLaps, cu
   const lapX = PAD.l + (currentLap - 1) / (N - 1) * innerW;
 
   return (
-    <section className="panel">
+    <section id="lap-chart" className='panel'>
       <div className="panel-head">
         <span className="panel-eb">LAP CHART</span>
         <span className="panel-meta">POSITIONS · LAP 1 — {N}</span>

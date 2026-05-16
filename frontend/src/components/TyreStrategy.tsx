@@ -43,7 +43,7 @@ export default function TyreStrategy({ results, drivers, totalLaps, selectedCode
   }
 
   return (
-    <section className="panel">
+    <section id="tyre-strategy">
       <div className="panel-head">
         <span className="panel-eb">TYRE STRATEGY</span>
         <span className="panel-meta">STINTS BY DRIVER · LAP 1 — {totalLaps}</span>
