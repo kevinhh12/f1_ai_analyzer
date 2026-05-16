@@ -7,6 +7,7 @@ import StatGrid from './components/StatGrid';
 import TopBar from './components/TopBar';
 import TyreStrategy from './components/TyreStrategy';
 import Sidebar from './components/Sidebar';
+import TrackMap from './components/TrackMap';
 
 interface ScrubberProps {
   totalLaps: number;
@@ -68,6 +69,7 @@ export default function App() {
           activeYear={activeYear}
           onPick={r => { setActiveRound(r.round); setActiveYear(r.year); }}
         />
+
         <main className="canvas">
           <header className="canvas-head">
             <div id="summary" className="title">
@@ -81,11 +83,18 @@ export default function App() {
             </div>
           </header>
 
+     
           <Scrubber totalLaps={race.laps} lap={lap} onChange={setLap} />
+          
           <StatGrid leader={leader} />
-          <Classification
+          <div id="map-classi" className='panel'>
+            <TrackMap track={race.track} year={activeYear} />
+            <Classification
             results={D.results} drivers={D.drivers}
             selectedCode={selectedCode} onSelect={setSelectedCode} />
+
+          </div>
+          
           <LapChart
             results={D.results} drivers={D.drivers}
             totalLaps={race.laps} currentLap={lap}

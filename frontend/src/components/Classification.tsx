@@ -45,7 +45,7 @@ export default function Classification({ results, drivers, selectedCode, onSelec
               <span className="cl-h pos">{r.pos === 1 ? 'P1' : r.pos}</span>
               <span className="cl-h num">{d.num ?? r.num}</span>
               <span className="cl-h drv">
-                <strong>{r.code}</strong> <span className="srn">{d.name}</span>
+                <strong>{r.code}</strong> 
               </span>
               <div className='teams'>
                 

@@ -1241,12 +1241,18 @@ body {
 
 /* ---------- CLASSIFICATION ---------- */
 
-.classification {
+#classification {
   display: flex;
   flex-direction: column;
 }
+.cl-head {
+  display: grid;
+  grid-template-columns: 8% 6% 7% 19% 15% 18% 11% 8%;
+  align-items: center;
+  gap: 8px;
+}
 
-.cl-head, .cl-row {
+.cl-row {
   display: grid;
   grid-template-columns: 48px 40px 1fr 140px 100px 88px 56px 88px;
   align-items: center;
@@ -1270,6 +1276,22 @@ body {
   flex-direction: column;
   gap: 1px;
 }
+
+#map-classi{
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+
+}
+
+#trackmap{
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+
+
 
 
 .teams{

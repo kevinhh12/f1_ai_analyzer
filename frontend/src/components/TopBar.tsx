@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { type Race } from '../data';
 
-const YEARS = [2024, 2023];
+
 
 interface Props {
   race: Race;
@@ -13,6 +13,7 @@ interface Props {
 
 export default function TopBar({ race, currentLap, totalLaps, onChangeRace, races }: Props) {
   const [open, setOpen] = useState(false);
+  const years = [...new Set(races.map(r => r.year))];
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -59,7 +60,7 @@ export default function TopBar({ race, currentLap, totalLaps, onChangeRace, race
             {selectedYear === null && (
               <div className="dropdown-years-only">
                 <div className="dropdown-step-label">SELECT SEASON</div>
-                {YEARS.map(y => (
+                {years.map(y => (
                   <button
                     key={y}
                     className="dropdown-year-row"
