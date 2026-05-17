@@ -39,7 +39,7 @@ export default function TopBar({ race, currentLap, totalLaps, onChangeRace, race
     <header className="topbar">
       <div className="brand">
         <div className="wm">
-          <span>F1</span><span style={{ color: '#e10600' }}>ANALYZER</span>
+          <span>F1</span><span style={{ color: '#e10600' }}>ENGINEER</span>
         </div>
       </div>
 

@@ -89,28 +89,148 @@ races: [
   { year: 2024, round: 22, track: 'yasmarina',    name: 'Abu Dhabi GP',      date: '26 NOV', country: 'AE', laps: 58 },
 ],
   drivers: [
-    { num: '01', code: 'VER', name: 'Verstappen',  team: 'Red Bull Racing',     color: '#3671c6' },
-    { num: '11', code: 'PER', name: 'Pérez',       team: 'Red Bull Racing',     color: '#3671c6' },
-    { num: '16', code: 'LEC', name: 'Leclerc',     team: 'Ferrari',      color: '#dc0000' },
-    { num: '55', code: 'SAI', name: 'Sainz',       team: 'Ferrari',      color: '#dc0000' },
-    { num: '44', code: 'HAM', name: 'Hamilton',    team: 'Mercedes',     color: '#27f4d2' },
-    { num: '63', code: 'RUS', name: 'Russell',     team: 'Mercedes',     color: '#27f4d2' },
-    { num: '04', code: 'NOR', name: 'Norris',      team: 'McLaren',      color: '#ff8000' },
-    { num: '81', code: 'PIA', name: 'Piastri',     team: 'McLaren',      color: '#ff8000' },
-    { num: '14', code: 'ALO', name: 'Alonso',      team: 'Aston Martin', color: '#229971' },
-    { num: '23', code: 'ALB', name: 'Albon',       team: 'Williams',     color: '#64c4ff' },
-    { num: '31', code: 'OCO', name: 'Ocon',        team: 'Alpine',       color: '#0090ff' },
+    { num: '01', code: 'VER', name: 'Verstappen',  team: 'Red Bull Racing', color: '#3671c6' },
+    { num: '22', code: 'TSU', name: 'Tsunoda',     team: 'Red Bull Racing', color: '#3671c6' },
+    { num: '04', code: 'NOR', name: 'Norris',      team: 'McLaren',         color: '#ff8000' },
+    { num: '81', code: 'PIA', name: 'Piastri',     team: 'McLaren',         color: '#ff8000' },
+    { num: '16', code: 'LEC', name: 'Leclerc',     team: 'Ferrari',         color: '#dc0000' },
+    { num: '44', code: 'HAM', name: 'Hamilton',    team: 'Ferrari',         color: '#dc0000' },
+    { num: '63', code: 'RUS', name: 'Russell',     team: 'Mercedes',        color: '#27f4d2' },
+    { num: '12', code: 'ANT', name: 'Antonelli',   team: 'Mercedes',        color: '#27f4d2' },
+    { num: '14', code: 'ALO', name: 'Alonso',      team: 'Aston Martin',    color: '#229971' },
+    { num: '18', code: 'STR', name: 'Stroll',      team: 'Aston Martin',    color: '#229971' },
+    { num: '23', code: 'ALB', name: 'Albon',       team: 'Williams',        color: '#64c4ff' },
+    { num: '55', code: 'SAI', name: 'Sainz',       team: 'Williams',        color: '#64c4ff' },
+    { num: '10', code: 'GAS', name: 'Gasly',       team: 'Alpine',          color: '#0090ff' },
+    { num: '07', code: 'DOO', name: 'Doohan',      team: 'Alpine',          color: '#0090ff' },
+    { num: '30', code: 'LAW', name: 'Lawson',      team: 'Racing Bulls',    color: '#6692ff' },
+    { num: '06', code: 'HAD', name: 'Hadjar',      team: 'Racing Bulls',    color: '#6692ff' },
+    { num: '87', code: 'BEA', name: 'Bearman',     team: 'Haas',            color: '#b6babd' },
+    { num: '31', code: 'OCO', name: 'Ocon',        team: 'Haas',            color: '#b6babd' },
+    { num: '27', code: 'HUL', name: 'Hülkenberg',  team: 'Audi',          color: '#52e252' },
+    { num: '05', code: 'BOR', name: 'Bortoleto',   team: 'Audi',          color: '#52e252' },
   ],
   results: [
-    { pos: 1,  num: '01', code: 'VER', best: '1:14.260', gap: 'LEADER',  tyres: ['M','M'],     stops: 1 },
-    { pos: 2,  num: '14', code: 'ALO', best: '1:14.586', gap: '+27.921', tyres: ['M','M'],     stops: 1 },
-    { pos: 3,  num: '44', code: 'HAM', best: '1:14.771', gap: '+33.531', tyres: ['M','I','M'], stops: 2 },
-    { pos: 4,  num: '63', code: 'RUS', best: '1:14.882', gap: '+34.668', tyres: ['M','I','M'], stops: 2 },
-    { pos: 5,  num: '31', code: 'OCO', best: '1:14.998', gap: '+38.211', tyres: ['M','I','M'], stops: 2 },
-    { pos: 6,  num: '16', code: 'LEC', best: '1:14.412', gap: '+39.426', tyres: ['M','I','M'], stops: 2 },
-    { pos: 7,  num: '55', code: 'SAI', best: '1:15.001', gap: '+45.995', tyres: ['M','I','M'], stops: 2 },
-    { pos: 8,  num: '04', code: 'NOR', best: '1:15.115', gap: '+47.021', tyres: ['M','I','M'], stops: 2 },
-    { pos: 9,  num: '11', code: 'PER', best: '1:14.890', gap: '+1 LAP',  tyres: ['H','M','I'], stops: 2 },
-    { pos: 10, num: '23', code: 'ALB', best: '1:15.488', gap: '+1 LAP',  tyres: ['M','I'],     stops: 1 },
+    { pos:  1, num: '01', code: 'VER', best: '1:14.260', gap: 'LEADER',    tyres: ['M','M'],     stops: 1 },
+    { pos:  2, num: '04', code: 'NOR', best: '1:14.486', gap: '+22.134',   tyres: ['M','M'],     stops: 1 },
+    { pos:  3, num: '16', code: 'LEC', best: '1:14.589', gap: '+31.452',   tyres: ['M','H'],     stops: 1 },
+    { pos:  4, num: '44', code: 'HAM', best: '1:14.621', gap: '+33.891',   tyres: ['M','I','M'], stops: 2 },
+    { pos:  5, num: '81', code: 'PIA', best: '1:14.712', gap: '+41.223',   tyres: ['M','H'],     stops: 1 },
+    { pos:  6, num: '63', code: 'RUS', best: '1:14.882', gap: '+44.668',   tyres: ['M','I','M'], stops: 2 },
+    { pos:  7, num: '14', code: 'ALO', best: '1:14.998', gap: '+52.341',   tyres: ['M','M'],     stops: 1 },
+    { pos:  8, num: '12', code: 'ANT', best: '1:15.112', gap: '+58.112',   tyres: ['M','H'],     stops: 1 },
+    { pos:  9, num: '55', code: 'SAI', best: '1:15.234', gap: '+1:04.231', tyres: ['M','I','M'], stops: 2 },
+    { pos: 10, num: '18', code: 'STR', best: '1:15.445', gap: '+1:12.445', tyres: ['M','M'],     stops: 1 },
+    { pos: 11, num: '10', code: 'GAS', best: '1:15.556', gap: '+1:21.334', tyres: ['M','I'],     stops: 1 },
+    { pos: 12, num: '23', code: 'ALB', best: '1:15.678', gap: '+1 LAP',    tyres: ['M','H'],     stops: 1 },
+    { pos: 13, num: '22', code: 'TSU', best: '1:15.789', gap: '+1 LAP',    tyres: ['H','M'],     stops: 1 },
+    { pos: 14, num: '30', code: 'LAW', best: '1:15.891', gap: '+1 LAP',    tyres: ['M','I','M'], stops: 2 },
+    { pos: 15, num: '07', code: 'DOO', best: '1:16.001', gap: '+1 LAP',    tyres: ['M','H'],     stops: 1 },
+    { pos: 16, num: '06', code: 'HAD', best: '1:16.112', gap: '+1 LAP',    tyres: ['M','I'],     stops: 1 },
+    { pos: 17, num: '87', code: 'BEA', best: '1:16.234', gap: '+1 LAP',    tyres: ['H','M'],     stops: 1 },
+    { pos: 18, num: '31', code: 'OCO', best: '1:16.445', gap: '+1 LAP',    tyres: ['M','I'],     stops: 1 },
+    { pos: 19, num: '27', code: 'HUL', best: '1:16.556', gap: '+2 LAPS',   tyres: ['M','H'],     stops: 1 },
+    { pos: 20, num: '05', code: 'BOR', best: '1:16.678', gap: '+2 LAPS',   tyres: ['H','M','H'], stops: 2 },
   ],
 };
+
+// ---------- LAP CHART TEST DATA ----------
+
+export function msToLabel(ms: number): string {
+  const m = Math.floor(ms / 60000);
+  const s = ((ms % 60000) / 1000).toFixed(3).padStart(6, '0');
+  return `${m}:${s}`;
+}
+
+export function msToAxisTick(ms: number): string {
+  const m = Math.floor(ms / 60000);
+  const s = Math.round((ms % 60000) / 1000).toString().padStart(2, '0');
+  return `${m}:${s}`;
+}
+
+export type LapEntry = Record<string, number | null>;
+
+// Per-lap position + gap snapshot, used by the live ranking panel
+export interface LapRanking {
+  lap: number;
+  order: { code: string; pos: number; gapMs: number }[];
+}
+
+export function formatGap(ms: number): string {
+  if (ms === 0) return 'LEADER';
+  const s = (ms / 1000).toFixed(3);
+  return `+${s}`;
+}
+
+function calcLapTime(r: Result, lap: number, totalLaps: number, BASE_MS: number): number {
+  const pit1 = Math.floor(totalLaps * 0.35);
+  const pit2 = Math.floor(totalLaps * 0.65);
+
+  if (lap === 1)                              return BASE_MS + 9000 + (r.pos - 1) * 300;
+  if (r.stops >= 1 && lap === pit1)           return BASE_MS + 26000 + (r.pos - 1) * 200;
+  if (r.stops >= 2 && lap === pit2)           return BASE_MS + 26000 + (r.pos - 1) * 200;
+
+  let stintLap: number;
+  if (r.stops === 0 || lap < pit1)        stintLap = lap - 1;
+  else if (r.stops === 1 || lap < pit2)   stintLap = lap - pit1;
+  else                                     stintLap = lap - pit2;
+
+  let ms = BASE_MS
+    + stintLap * 55
+    + (r.pos - 1) * 110
+    + Math.sin(lap * 7.31 + r.pos * 13.7) * 320
+    + Math.sin(lap * 3.17 + r.pos * 5.3)  * 180
+    + Math.sin(lap * 19.1 + r.pos * 2.9)  * 90;
+
+  if (r.pos >= 6 && lap > Math.floor(totalLaps * 0.45) && lap < Math.floor(totalLaps * 0.50))
+    ms += 600;
+
+  return Math.max(70000, ms);
+}
+
+export function generateLapData(
+  results: Result[],
+  totalLaps: number
+): { chartData: LapEntry[]; rankings: LapRanking[] } {
+  const BASE_MS = 74200;
+
+  // Accumulate cumulative race time per driver across all laps
+  const cumulative: Record<string, number> = {};
+  results.forEach(r => { cumulative[r.code] = 0; });
+
+  const chartData: LapEntry[] = [];
+  const rankings: LapRanking[] = [];
+
+  for (let lap = 1; lap <= totalLaps; lap++) {
+    const entry: LapEntry = { lap };
+
+    // Compute this lap's time for each driver and add to cumulative
+    results.forEach(r => {
+      const lt = calcLapTime(r, lap, totalLaps, BASE_MS);
+      cumulative[r.code] += lt;
+      entry[r.code] = lt;
+    });
+
+    // Derive position and gap from cumulative race time
+    const sorted = [...results].sort((a, b) => cumulative[a.code] - cumulative[b.code]);
+    const leaderTime = cumulative[sorted[0].code];
+
+    sorted.forEach((r, i) => {
+      entry[`${r.code}_pos`] = i + 1;
+      entry[`${r.code}_gap`] = cumulative[r.code] - leaderTime;
+    });
+
+    chartData.push(entry);
+
+    rankings.push({
+      lap,
+      order: sorted.map((r, i) => ({
+        code: r.code,
+        pos: i + 1,
+        gapMs: cumulative[r.code] - leaderTime,
+      })),
+    });
+  }
+
+  return { chartData, rankings };
+}

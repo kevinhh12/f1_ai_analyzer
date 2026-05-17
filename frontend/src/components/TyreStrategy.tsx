@@ -49,7 +49,7 @@ export default function TyreStrategy({ results, drivers, totalLaps, selectedCode
         <span className="panel-meta">STINTS BY DRIVER · LAP 1 — {totalLaps}</span>
       </div>
       <div className="strat">
-        {results.slice(0, 8).map(r => {
+        {results.map(r => {
           const d = byCode[r.code] ?? { team: '—', color: '#9ea2ac', name: '', num: r.num, code: r.code };
           const sel = r.code === selectedCode;
           const segs = stints(r.tyres);

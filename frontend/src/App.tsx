@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import './css/styles.css';
-import { F1_DATA } from './data';
+import { F1_DATA, generateLapData, } from './data';
 import Classification from './components/Classification';
 import LapChart from './components/LapChart';
 import StatGrid from './components/StatGrid';
@@ -51,6 +51,11 @@ export default function App() {
     if (lap > race.laps) setLap(Math.min(lap, race.laps));
   }, [race.laps]);
 
+  const { rankings } = useMemo(
+    () => generateLapData(D.results, race.laps),
+    [race.laps]
+  );
+
   const leader = D.results[0];
 
   return (
@@ -90,8 +95,9 @@ export default function App() {
           <div id="map-classi" className='panel'>
             <TrackMap track={race.track} year={activeYear} />
             <Classification
-            results={D.results} drivers={D.drivers}
-            selectedCode={selectedCode} onSelect={setSelectedCode} />
+              results={D.results} drivers={D.drivers}
+              selectedCode={selectedCode} onSelect={setSelectedCode}
+              rankings={rankings} currentLap={lap} />
 
           </div>
           

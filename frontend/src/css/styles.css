@@ -1092,6 +1092,7 @@ body {
   box-shadow: inset 2px 0 0 var(--fg);
 }
 
+
 /* ---------- CANVAS ---------- */
 
 .canvas {
@@ -1101,6 +1102,8 @@ body {
   flex-direction: column;
   gap: 18px;
 }
+
+
 
 .canvas-head {
   display: flex;
@@ -1247,7 +1250,7 @@ body {
 }
 .cl-head {
   display: grid;
-  grid-template-columns: 8% 6% 7% 19% 15% 18% 11% 8%;
+  grid-template-columns: 6% 4% 9% 22% 17% 15% 8% 8%;
   align-items: center;
   gap: 8px;
 }
@@ -1255,7 +1258,7 @@ body {
 
 .cl-row {
   display: grid;
-  grid-template-columns: 48px 40px 1fr 140px 100px 88px 56px 88px;
+  grid-template-columns: 31px 27px 51px 140px 100px 69px 52px 72px;
   align-items: center;
   gap: 8px;
 }
@@ -1276,6 +1279,9 @@ body {
   display: flex;
   flex-direction: column;
   gap: 1px;
+  max-height: 500px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 #map-classi{
@@ -1430,6 +1436,9 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  max-height: 500px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .strat-row {
