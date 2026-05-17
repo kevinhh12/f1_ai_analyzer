@@ -1,4 +1,9 @@
+"use client"
+
+import { useMemo } from "react"
+import { CartesianGrid, Line, LineChart, ReferenceLine, XAxis, YAxis, Tooltip } from "recharts"
 import { type Driver, type Result } from '../data';
+import { ChartContainer, type ChartConfig } from "../components/ui/chart"
 
 interface Props {
   results: Result[];
@@ -8,95 +13,225 @@ interface Props {
   currentLap: number;
 }
 
-// Lap-by-lap chart showing position changes — SVG line chart, leader bold red.
-export default function LapChart({ results, drivers, selectedCode, totalLaps, currentLap }: Props) {
-  const W = 880, H = 300, PAD = { l: 40, r: 16, t: 12, b: 32 };
-  const innerW = W - PAD.l - PAD.r;
-  const innerH = H - PAD.t - PAD.b;
-  const N = totalLaps;
-  const POS = 10;
+function msToLabel(ms: number): string {
+  const m = Math.floor(ms / 60000);
+  const s = ((ms % 60000) / 1000).toFixed(3).padStart(6, '0');
+  return `${m}:${s}`;
+}
 
-  function hash(s: string, n: number): number {
-    let h = 0;
-    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-    return ((h ^ n * 2654435761) >>> 0) / 4294967295;
-  }
+function msToAxisTick(ms: number): string {
+  const m = Math.floor(ms / 60000);
+  const s = Math.round((ms % 60000) / 1000).toString().padStart(2, '0');
+  return `${m}:${s}`;
+}
 
-  const byCode = Object.fromEntries(drivers.map(d => [d.code, d]));
+// Generates per-driver, per-lap data.
+// Each driver gets a `{code}` key (numeric ms lap time) used as the Y value.
+// Pit stop laps are stored as null so recharts renders a gap instead of a spike.
+// Position is stored as `{code}_pos` for the tooltip.
+function generateLapData(results: Result[], totalLaps: number) {
+  const n = results.length;
+  const BASE_MS = 74200;
 
-  const lines = results.slice(0, POS).map(r => {
-    const d = byCode[r.code] ?? { color: '#9ea2ac' };
-    const points: [number, number][] = [];
-    let pos = r.pos + (r.code === 'VER' ? 0 : Math.round(hash(r.code, 0) * 4 - 2));
-    pos = Math.max(1, Math.min(POS, pos));
-    for (let lap = 1; lap <= N; lap++) {
-      const drift = Math.round((hash(r.code, lap) - 0.5) * 1.6);
-      pos = Math.max(1, Math.min(POS, pos + drift));
-      const conv = lap / N;
-      const blended = Math.round(pos * (1 - conv) + r.pos * conv);
-      points.push([lap, blended]);
-    }
-    const path = points.map(([l, p], i) => {
-      const x = PAD.l + (l - 1) / (N - 1) * innerW;
-      const y = PAD.t + (p - 1) / (POS - 1) * innerH;
-      return (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1);
-    }).join(' ');
-    return { code: r.code, color: d.color, path, sel: r.code === selectedCode, lead: r.code === 'VER' };
+  const gridOffset: Record<string, number> = {
+    VER: 0, LEC: 1, NOR: -1, HAM: 2, SAI: -2,
+    RUS: 1, ALO: -3, PER: 3, OCO: -1, ALB: 0,
+  };
+
+  const startPos: Record<string, number> = {};
+  results.forEach(r => {
+    const raw = r.pos + (gridOffset[r.code] ?? 0);
+    startPos[r.code] = Math.max(1, Math.min(n, raw));
   });
 
-  const lapX = PAD.l + (currentLap - 1) / (N - 1) * innerW;
+  const data: Record<string, number | null>[] = [];
+
+  for (let lap = 1; lap <= totalLaps; lap++) {
+    const t = (lap - 1) / Math.max(totalLaps - 1, 1);
+    const entry: Record<string, number | null> = { lap };
+
+    results.forEach(r => {
+      const pit1 = Math.floor(totalLaps * 0.35);
+      const pit2 = Math.floor(totalLaps * 0.65);
+      const pitWindow = Math.floor(totalLaps * 0.06);
+
+      // --- Position (for tooltip only) ---
+      let pos = startPos[r.code] + (r.pos - startPos[r.code]) * t;
+      if (r.stops >= 1 && lap >= pit1 && lap < pit1 + pitWindow) {
+        const wave = Math.sin((Math.PI * (lap - pit1)) / pitWindow);
+        pos += wave * (2 + r.pos * 0.3);
+      }
+      if (r.stops >= 2 && lap >= pit2 && lap < pit2 + pitWindow) {
+        const wave = Math.sin((Math.PI * (lap - pit2)) / pitWindow);
+        pos += wave * (1.5 + r.pos * 0.2);
+      }
+      entry[`${r.code}_pos`] = Math.max(1, Math.min(n, pos));
+
+      // --- Lap time (Y axis value) ---
+      const isPit1 = r.stops >= 1 && lap === pit1;
+      const isPit2 = r.stops >= 2 && lap === pit2;
+
+      // Pit stop laps: base time + ~26s in pit lane → sharp spike downward
+      if (isPit1 || isPit2) {
+        entry[r.code] = BASE_MS + 26000 + (r.pos - 1) * 200;
+        return;
+      }
+
+      // Lap 1: formation + cold tyres
+      if (lap === 1) {
+        entry[r.code] = BASE_MS + 9000 + (r.pos - 1) * 300;
+        return;
+      }
+
+      // Which stint lap are we on? → drives tire degradation
+      let stintLap: number;
+      if (r.stops === 0 || lap < pit1)         stintLap = lap - 1;
+      else if (r.stops === 1 || lap < pit2)     stintLap = lap - pit1;
+      else                                       stintLap = lap - pit2;
+
+      let ms = BASE_MS;
+
+      // Tire degradation: gradual fall-off within each stint
+      ms += stintLap * 55;
+
+      // Backmarkers run slightly slower
+      ms += (r.pos - 1) * 110;
+
+      // High-frequency noise: makes lines look like real telemetry
+      const noise =
+        Math.sin(lap * 7.31 + r.pos * 13.7) * 320 +
+        Math.sin(lap * 3.17 + r.pos * 5.3)  * 180 +
+        Math.sin(lap * 19.1 + r.pos * 2.9)  * 90;
+      ms += noise;
+
+      // Traffic / safety car effect mid-race for lower runners
+      if (r.pos >= 6 && lap > Math.floor(totalLaps * 0.45) && lap < Math.floor(totalLaps * 0.50)) {
+        ms += 600;
+      }
+
+      entry[r.code] = Math.max(70000, ms);
+    });
+
+    data.push(entry);
+  }
+
+  return data;
+}
+
+// Tooltip: selected driver only — shows lap, position, and lap time
+function LapTooltip({ active, payload, label, drivers, selectedCode }: any) {
+  if (!active || !payload?.length) return null;
+
+  const selected = payload.find((p: any) => p.dataKey === selectedCode);
+  if (!selected || selected.value == null) return null;
+
+  const d = (drivers as Driver[]).find(d => d.code === selectedCode);
+  const pos  = Math.round(selected.payload[`${selectedCode}_pos`] ?? 0);
+  const time = msToLabel(selected.value);
 
   return (
-    <section id="lap-chart" className='panel'>
-      <div className="panel-head">
-        <span className="panel-eb">LAP CHART</span>
-        <span className="panel-meta">POSITIONS · LAP 1 — {N}</span>
+    <div className="lap-tooltip">
+      <div className="lap-tooltip-header">LAP {label}</div>
+      <div className="lap-tooltip-row" style={{ color: d?.color ?? '#fff' }}>
+        <span className="ltt-pos">P{pos}</span>
+        <span className="ltt-code">{selectedCode}</span>
+        <span className="ltt-time">{time}</span>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="lap-svg">
-        {/* gridlines */}
-        {Array.from({ length: POS }).map((_, i) => (
-          <line key={'h' + i}
-            x1={PAD.l} x2={W - PAD.r}
-            y1={PAD.t + i / (POS - 1) * innerH} y2={PAD.t + i / (POS - 1) * innerH}
-            stroke="#1c1e23" strokeWidth="1" />
-        ))}
-        {[0, .25, .5, .75, 1].map((t, i) => (
-          <line key={'v' + i}
-            y1={PAD.t} y2={H - PAD.b}
-            x1={PAD.l + t * innerW} x2={PAD.l + t * innerW}
-            stroke="#1c1e23" strokeWidth="1" />
-        ))}
-        {/* lap labels */}
-        {[1, Math.round(N * .25), Math.round(N * .5), Math.round(N * .75), N].map((l, i) => (
-          <text key={'lx' + i}
-            x={PAD.l + (l - 1) / (N - 1) * innerW} y={H - PAD.b + 18}
-            fontSize="10" fontFamily="JetBrains Mono, monospace"
-            fill="#6a6e78" textAnchor="middle">L{l}</text>
-        ))}
-        {/* position labels */}
-        {[1, 3, 5, 7, 10].map(p => (
-          <text key={'p' + p} x={PAD.l - 8} y={PAD.t + (p - 1) / (POS - 1) * innerH + 3}
-            fontSize="10" fontFamily="JetBrains Mono, monospace"
-            fill="#6a6e78" textAnchor="end">P{p}</text>
-        ))}
-        {/* current lap marker */}
-        <line x1={lapX} x2={lapX} y1={PAD.t} y2={H - PAD.b}
-              stroke="#e10600" strokeWidth="1.5" strokeDasharray="2,3" opacity="0.7" />
-        {/* lines — non-selected first, selected last (on top) */}
-        {lines.filter(l => !l.sel).map(l => (
-          <path key={l.code} d={l.path}
-                stroke={l.color} strokeWidth={l.lead ? 2 : 1.2}
-                fill="none" opacity={l.lead ? 0.95 : 0.45}
-                strokeLinejoin="round" strokeLinecap="round" />
-        ))}
-        {lines.filter(l => l.sel).map(l => (
-          <path key={l.code} d={l.path}
-                stroke={l.color} strokeWidth="2.5"
-                fill="none" opacity="1"
-                strokeLinejoin="round" strokeLinecap="round"
-                style={{ filter: 'drop-shadow(0 0 4px ' + l.color + ')' }} />
-        ))}
-      </svg>
-    </section>
+    </div>
+  );
+}
+
+export default function LapChart({ results, drivers, selectedCode, totalLaps, currentLap }: Props) {
+  const byCode = Object.fromEntries(drivers.map(d => [d.code, d]));
+
+  const chartData = useMemo(
+    () => generateLapData(results, totalLaps),
+    [results, totalLaps]
+  );
+
+  const chartConfig: ChartConfig = useMemo(() => (
+    Object.fromEntries(
+      results.map(r => [r.code, { label: r.code, color: byCode[r.code]?.color ?? '#888' }])
+    )
+  ), [results, drivers]);
+
+  // X axis: ticks every 5 laps for short races (≤20 laps), every 10 laps for typical
+  const tickEvery = totalLaps <= 20 ? 5 : totalLaps <= 60 ? 10 : 15;
+  const xTicks = Array.from(
+    { length: Math.floor(totalLaps / tickEvery) + 1 },
+    (_, i) => i * tickEvery
+  ).filter(t => t > 0 && t <= totalLaps);
+
+  // Y axis: reversed so fast laps sit at top, pit spikes go downward
+  // Domain covers normal racing (72–81s) + pit stop laps (~100s)
+  const yMin = 71000;
+  const yMax = 102000;
+  const yTicks = [72000, 74000, 76000, 78000, 80000, 84000, 90000, 96000, 102000];
+
+  return (
+    <div id="lap-chart" className="panel">
+      <header className="lc-head">
+        <span className="lc-title">LAP CHART</span>
+        <span className="lc-sub">Lap time by lap</span>
+      </header>
+
+      <ChartContainer config={chartConfig} className="lc-container" tabIndex={-1}>
+        <LineChart
+          data={chartData}
+          margin={{ top: 8, right: 24, bottom: 4, left: 8 }}
+        >
+          <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.06)" />
+
+          <XAxis
+            dataKey="lap"
+            ticks={xTicks}
+            tickLine={false}
+            axisLine={false}
+            tick={{ fill: '#6b7280', fontSize: 11 }}
+            label={{ value: 'LAP', position: 'insideBottomRight', offset: -4, fill: '#6b7280', fontSize: 10 }}
+          />
+
+          <YAxis
+            domain={[yMin, yMax]}
+            ticks={yTicks}
+            tickLine={false}
+            axisLine={false}
+            tick={{ fill: '#6b7280', fontSize: 10 }}
+            tickFormatter={msToAxisTick}
+            width={42}
+          />
+
+          <Tooltip
+            content={<LapTooltip drivers={drivers} selectedCode={selectedCode} />}
+            cursor={{ stroke: 'rgba(255,255,255,0.12)', strokeWidth: 1 }}
+          />
+
+          <ReferenceLine
+            x={currentLap}
+            stroke="rgba(255,255,255,0.25)"
+            strokeWidth={1}
+            strokeDasharray="4 3"
+          />
+
+          {results.map(r => {
+            const isSelected = r.code === selectedCode;
+            const color = byCode[r.code]?.color ?? '#888';
+            return (
+              <Line
+                key={r.code}
+                dataKey={r.code}
+                type="monotone"
+                stroke={color}
+                strokeWidth={isSelected ? 2.5 : 1}
+                strokeOpacity={isSelected ? 1 : 0.28}
+                dot={false}
+                activeDot={isSelected ? { r: 4, fill: color, strokeWidth: 0 } : false}
+                isAnimationActive={false}
+              />
+            );
+          })}
+        </LineChart>
+      </ChartContainer>
+    </div>
   );
 }

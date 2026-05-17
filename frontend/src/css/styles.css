@@ -1252,6 +1252,7 @@ body {
   gap: 8px;
 }
 
+
 .cl-row {
   display: grid;
   grid-template-columns: 48px 40px 1fr 140px 100px 88px 56px 88px;
@@ -1878,5 +1879,87 @@ body {
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.556 0 0);
   }
-  
+
+
+/* ---------- LAP CHART ---------- */
+
+#lap-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lc-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.lc-title {
+  font: 700 11px var(--font-sans);
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--fg);
+}
+
+.lc-sub {
+  font: 500 10px var(--font-mono);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+}
+
+.lc-container {
+  width: 100%;
+  height: 240px;
+  outline: none;
+}
+
+.lc-container:focus,
+.lc-container *:focus {
+  outline: none;
+}
+
+.lap-tooltip {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  min-width: 80px;
+}
+
+.lap-tooltip-header {
+  font: 700 10px var(--font-mono);
+  letter-spacing: .12em;
+  color: var(--fg-faint);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.lap-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 600 11px var(--font-mono);
+  line-height: 1.6;
+}
+
+.ltt-pos {
+  font-size: 10px;
+  opacity: 0.6;
+  min-width: 22px;
+}
+
+.ltt-code {
+  letter-spacing: .06em;
+}
+
+.ltt-time {
+  font: 500 11px var(--font-mono);
+  letter-spacing: .04em;
+  opacity: 0.85;
+  margin-left: auto;
+  padding-left: 10px;
+}
+
 }
