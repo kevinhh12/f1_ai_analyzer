@@ -1026,11 +1026,21 @@ body {
   padding: 7px 8px;
   border-radius: 3px;
   text-align: left;
-  transition: background 120ms var(--ease-out);
+  transition: background 150ms ease, transform 150ms ease, box-shadow 150ms ease, color 150ms ease;
 }
 
 .rail-item:hover {
-  background: var(--bg-elevated);
+  background: rgba(225, 6, 0, 0.06);
+  transform: translateX(3px);
+  box-shadow: inset 2px 0 0 rgba(225, 6, 0, 0.55);
+}
+
+.rail-item:hover .rd {
+  color: #ff6b6b;
+}
+
+.rail-item:hover .nm {
+  color: var(--fg);
 }
 
 .rail-item.active {
@@ -1079,11 +1089,14 @@ body {
   letter-spacing: .12em;
   text-transform: uppercase;
   color: var(--fg-subtle);
+  transition: background 150ms ease, transform 150ms ease, box-shadow 150ms ease, color 150ms ease;
 }
 
 .rail-view:hover {
-  background: var(--bg-elevated);
-  color: var(--fg-muted);
+  background: rgba(225, 6, 0, 0.06);
+  color: var(--fg);
+  transform: translateX(3px);
+  box-shadow: inset 2px 0 0 rgba(225, 6, 0, 0.55);
 }
 
 .rail-view.active {
@@ -1234,12 +1247,14 @@ body {
   letter-spacing: .2em;
   text-transform: uppercase;
   color: var(--fg);
+  padding: 10px ;
 }
 
 .panel-meta {
   font: 500 10px var(--font-mono);
   color: var(--fg-faint);
   letter-spacing: .04em;
+  padding: 10px ;
 }
 
 /* ---------- CLASSIFICATION ---------- */
@@ -1332,11 +1347,13 @@ body {
   padding: 10px 14px;
   cursor: pointer;
   text-align: left;
-  transition: background 120ms var(--ease-out);
+  transition: background 150ms ease, transform 150ms ease, border-left-color 150ms ease;
 }
 
 .cl-row:hover {
-  background: var(--bg-raised);
+  background: rgba(225, 6, 0, 0.05);
+  transform: translateX(2px);
+  border-left-color: rgba(225, 6, 0, 0.7);
 }
 
 .cl-row.sel {
@@ -1439,6 +1456,7 @@ body {
   max-height: 500px;
   overflow-y: auto;
   overflow-x: hidden;
+  padding: 10px 14px;
 }
 
 .strat-row {
@@ -1452,11 +1470,13 @@ body {
   gap: 10px;
   align-items: center;
   text-align: left;
-  transition: background 120ms var(--ease-out);
+  transition: background 150ms ease, transform 150ms ease, border-color 150ms ease;
 }
 
 .strat-row:hover {
-  background: var(--bg-raised);
+  background: rgba(225, 6, 0, 0.05);
+  transform: translateX(2px);
+  border-color: rgba(225, 6, 0, 0.35);
 }
 
 .strat-row.sel {
@@ -1521,6 +1541,7 @@ body {
   gap: 14px;
   padding-top: 8px;
   border-top: 1px solid var(--border-subtle);
+  padding: 10px ;
 }
 
 .legend-item {
@@ -1568,8 +1589,18 @@ body {
   justify-content: center;
 }
 
-.scrubber .play:hover {
-  background: #b80500;
+.play {
+  transition: transform 0.16s ease, background 0.16s ease;
+}
+
+.play:hover {
+  transform: scale(1.08);
+  background: #e10600;
+  cursor: pointer;
+}
+
+.play:active {
+  transform: scale(0.96);
 }
 
 .scrubber .lap-lbl {
@@ -1973,6 +2004,9 @@ body {
 
 }
 
+/* ---------- HOVER Effect---------- */
+
+
 /* ---------- SCROLLBAR ---------- */
 
 ::-webkit-scrollbar {
@@ -1996,4 +2030,45 @@ body {
 * {
   scrollbar-width: thin;
   scrollbar-color: #2a2a2a #0a0a0a;
+}
+
+/* ---------- PANEL HOVER LIFT ---------- */
+
+@keyframes panel-border-flash {
+  0%   { border-color: var(--border); }
+  18%  { border-color: #e10600;
+         box-shadow: 0 0 0 1px rgba(225, 6, 0, 0.45),
+                     0 24px 64px rgba(0, 0, 0, 0.65); }
+  100% { border-color: rgba(225, 6, 0, 0.18);
+         box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5); }
+}
+
+#lap-chart,
+#classification,
+#tyre-strategy,
+#trackmap {
+  position: relative;
+  z-index: 1;
+  /* spring curve: overshoots slightly then settles — same feel as Linear cards */
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ensure #tyre-strategy has a base border to animate from */
+#tyre-strategy {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+#lap-chart:hover,
+#classification:hover,
+#tyre-strategy:hover,
+#trackmap:hover {
+  transform: scale(1.025);
+  z-index: 20;
+  animation: panel-border-flash 0.45s ease forwards;
+}
+
+/* allow scaled children to overflow their immediate container */
+#map-classi {
+  overflow: visible;
 }

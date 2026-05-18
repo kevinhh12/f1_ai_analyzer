@@ -39,7 +39,7 @@ export default function Classification({ results, drivers, selectedCode, onSelec
   }
 
   return (
-    <section id="classification" className='panel classification-scroll'>
+    <section id="classification" className='panel classification-scroll f1-hover'>
       <header className="cl-head">
         <span className="cl-h pos">POS</span>
         <span className="cl-h num">#</span>
