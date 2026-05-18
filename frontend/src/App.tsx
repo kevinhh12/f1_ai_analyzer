@@ -8,6 +8,7 @@ import TopBar from './components/TopBar';
 import TyreStrategy from './components/TyreStrategy';
 import Sidebar from './components/Sidebar';
 import TrackMap from './components/TrackMap';
+import BottomRaceDrawer from './components/BottomDrawer';
 
 interface ScrubberProps {
   totalLaps: number;
@@ -92,13 +93,12 @@ export default function App() {
           <Scrubber totalLaps={race.laps} lap={lap} onChange={setLap} />
           
           <StatGrid leader={leader} />
-          <div id="map-classi" className='panel'>
+          <div id="map-classi" className='panel flex lg:!flex-col'>
             <TrackMap track={race.track} year={activeYear} />
             <Classification
               results={D.results} drivers={D.drivers}
               selectedCode={selectedCode} onSelect={setSelectedCode}
               rankings={rankings} currentLap={lap} />
-
           </div>
           
           <LapChart
@@ -109,6 +109,9 @@ export default function App() {
             results={D.results} drivers={D.drivers}
             totalLaps={race.laps}
             selectedCode={selectedCode} onSelect={setSelectedCode} />
+
+          <BottomRaceDrawer />
+          
         </main>
       </div>
     </div>
