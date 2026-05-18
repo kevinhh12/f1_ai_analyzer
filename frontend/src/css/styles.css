@@ -1523,6 +1523,34 @@ body {
   border-right: none;
 }
 
+/* Currently active stint — subtle right-edge pulse to show it's live */
+.strat-seg--active {
+  position: relative;
+}
+
+.strat-seg--active::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.7);
+  animation: stint-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes stint-pulse {
+  0%, 100% { opacity: 0.2; }
+  50%       { opacity: 1; }
+}
+
+/* Unknown remaining laps — hollow bar space */
+.strat-seg--unknown {
+  background: transparent;
+  border-left: 1px dashed var(--border);
+  min-width: 0;
+}
+
 .strat-seg-lbl {
   font: 700 9px var(--font-sans);
   letter-spacing: .14em;

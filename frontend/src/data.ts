@@ -1,5 +1,35 @@
 export type TyreCompound = 'S' | 'M' | 'H' | 'I' | 'W';
 
+export interface Stint {
+  compound: TyreCompound;
+  startLap: number; // 1-indexed, inclusive
+  endLap: number;   // 1-indexed, inclusive
+}
+
+// Returns the exact lap ranges for each stint based on pit lap logic
+// (mirrors the pit timing in calcLapTime)
+export function getStints(result: Result, totalLaps: number): Stint[] {
+  const pit1 = Math.floor(totalLaps * 0.35);
+  const pit2 = Math.floor(totalLaps * 0.65);
+  const { tyres, stops } = result;
+
+  if (stops === 0) {
+    return [{ compound: tyres[0], startLap: 1, endLap: totalLaps }];
+  }
+  if (stops === 1) {
+    return [
+      { compound: tyres[0], startLap: 1,        endLap: pit1 - 1 },
+      { compound: tyres[1], startLap: pit1,      endLap: totalLaps },
+    ];
+  }
+  // 2+ stops
+  return [
+    { compound: tyres[0], startLap: 1,        endLap: pit1 - 1 },
+    { compound: tyres[1], startLap: pit1,      endLap: pit2 - 1 },
+    { compound: tyres[2] ?? tyres[1], startLap: pit2, endLap: totalLaps },
+  ];
+}
+
 export interface Race {
   year: number;
   round: number;

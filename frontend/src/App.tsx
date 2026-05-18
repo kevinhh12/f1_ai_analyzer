@@ -107,7 +107,8 @@ export default function App() {
             selectedCode={selectedCode} />
           <TyreStrategy
             results={D.results} drivers={D.drivers}
-            totalLaps={race.laps}
+            totalLaps={race.laps} currentLap={lap}
+            rankings={rankings}
             selectedCode={selectedCode} onSelect={setSelectedCode} />
 
           <BottomRaceDrawer />
