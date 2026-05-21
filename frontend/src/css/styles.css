@@ -1301,7 +1301,7 @@ body {
 
 #map-classi{
   display: flex;
-  flex-direction: row;
+  flex-direction: col;
   justify-content: space-between;
 
 }

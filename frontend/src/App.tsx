@@ -93,7 +93,7 @@ export default function App() {
           <Scrubber totalLaps={race.laps} lap={lap} onChange={setLap} />
           
           <StatGrid leader={leader} />
-          <div id="map-classi" className='panel flex lg:!flex-col'>
+          <div id="map-classi" className='panel flex 2xl:!flex-row'>
             <TrackMap track={race.track} year={activeYear} />
             <Classification
               results={D.results} drivers={D.drivers}
