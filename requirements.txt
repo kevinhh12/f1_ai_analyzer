@@ -6,4 +6,5 @@ matplotlib     # creates charts later
 jupyter        # runs exploration notebooks
 pytest         # testing
 python-dotenv  # loads .env variables, useful later for API keys
-httpx         # makes HTTP requests, useful later for external APIs
+httpx          # makes HTTP requests, useful later for external APIs
+openai         # OpenAI SDK for GPT chat

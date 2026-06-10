@@ -111,7 +111,14 @@ export default function App() {
             rankings={rankings}
             selectedCode={selectedCode} onSelect={setSelectedCode} />
 
-          <BottomRaceDrawer />
+          <BottomRaceDrawer
+            
+            race={race}
+            currentLap={lap}
+            results={D.results}
+            drivers={D.drivers}
+            rankings={rankings}
+          />
           
         </main>
       </div>

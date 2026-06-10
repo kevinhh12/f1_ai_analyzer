@@ -7,7 +7,10 @@ It does not directly access the OpenF1 API or contain any request logic.
 All data comes from services/openf1.py
 """
 
+from __future__ import annotations
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from typing import Optional, List
 from app.services.openf1 import (
     get_races,
     get_drivers,
@@ -17,6 +20,35 @@ from app.services.openf1 import (
     get_position,
     get_session_key,
 )
+from app.services.ai import ask
+
+
+# ── Chat request / response models ───────────────────────────────────────────
+
+class ChatHistoryMessage(BaseModel):
+    role: str    # "user" | "ai"
+    content: str
+
+class RaceContext(BaseModel):
+    race: dict
+    current_lap: int
+    standings: List[dict]
+    results: List[dict]
+    drivers: List[dict]
+
+class ChatRequest(BaseModel):
+    message: str
+    history: List[ChatHistoryMessage] = []
+    context: RaceContext
+
+class HighlightStat(BaseModel):
+    label: str
+    value: str
+
+class ChatResponse(BaseModel):
+    answer: str
+    insights: List[str]
+    highlight: Optional[HighlightStat] = None
 
 router = APIRouter()
 
@@ -155,5 +187,37 @@ def get_session(season: int, circuit: str):
         return {"season": season, "circuit": circuit, "session_key": key}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── AI Chat ───────────────────────────────────────────────────────────────────
+
+@router.post("/chat", response_model=ChatResponse)
+def chat(req: ChatRequest):
+    """
+    Send a user message with race context to Claude and get a structured analysis response.
+
+    Body:
+        message:  The user's question
+        history:  Previous messages in the conversation (role + content)
+        context:  Live race data snapshot (standings, results, drivers, current lap)
+
+    Returns:
+        answer:    Main response text
+        insights:  Supporting bullet points (0-3 items)
+        highlight: Key stat callout e.g. { label: "Gap", value: "+4.3s" }
+
+    Example: POST /chat
+    """
+    try:
+        result = ask(
+            message=req.message,
+            history=[m.model_dump() for m in req.history],
+            context=req.context.model_dump(),
+        )
+        return ChatResponse(**result)
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
