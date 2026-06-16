@@ -1,6 +1,59 @@
 import { useState, useEffect, useMemo } from 'react';
 import './css/styles.css';
-import { F1_DATA, generateLapData, } from './data';
+import { F1_DATA, generateLapData, processRealLapData, buildResultsFromLaps, processStintData, type Race, type Driver, type Result, type LapEntry, type LapRanking, type Stint } from './data';
+
+
+const LAPS_BY_CIRCUIT: Record<string, number> = {
+  Melbourne: 58,
+  Shanghai: 56,
+  Suzuka: 53,
+  Bahrain: 57,
+  Jeddah: 50,
+  Miami: 57,
+  Imola: 63,
+  Monaco: 78,
+  Barcelona: 66,
+  Montreal: 70,
+  Spielberg: 71,
+  Silverstone: 52,
+  Budapest: 70,
+  Spa: 44,
+  Zandvoort: 72,
+  Monza: 53,
+  Baku: 51,
+  Singapore: 62,
+  Austin: 56,
+  'Mexico City': 71,
+  'São Paulo': 71,
+  'Las Vegas': 50,
+  Lusail: 57,
+  'Yas Marina': 58,
+};
+
+function adaptDriver(d: any): Driver {
+  return {
+    num: String(d.driver_number),
+    code: d.name_acronym,
+    name: d.full_name.split(' ').map((w: string) =>
+      w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+    ).join(' '),
+    team: d.team_name,
+    color: '#' + (d.team_colour ?? '9ea2ac'),
+  };
+}
+
+function adaptRace(session: any, index: number): Race {
+  return {
+    year: session.year,
+    round: index + 1,
+    name: session.circuit_short_name,
+    country: session.country_name,
+    date: session.date_start.slice(0, 10),
+    track: session.circuit_short_name,
+    laps: LAPS_BY_CIRCUIT[session.circuit_short_name] ?? 58, // real laps loaded after pick
+    session_key: session.session_key,
+  };
+}
 import Classification from './components/Classification';
 import LapChart from './components/LapChart';
 import StatGrid from './components/StatGrid';
@@ -17,6 +70,7 @@ interface ScrubberProps {
 }
 
 function Scrubber({ totalLaps, lap, onChange }: ScrubberProps) {
+
   const [playing, setPlaying] = useState(false);
   useEffect(() => {
     if (!playing) return;
@@ -41,23 +95,112 @@ function Scrubber({ totalLaps, lap, onChange }: ScrubberProps) {
 
 export default function App() {
   const D = F1_DATA;
-  const [activeRound, setActiveRound] = useState(6);
-  const latestYear = Math.max(...D.races.map(r => r.year));
-  const [activeYear, setActiveYear] = useState(latestYear);
-  const race = D.races.find(r => r.round === activeRound && r.year === activeYear) ?? D.races[0];
-  const [lap, setLap] = useState(47);
+  const [activeRound, setActiveRound] = useState(1);
+  const [activeYear, setActiveYear] = useState(2025);
+  const [races, setRaces] = useState<Race[]>(D.races);
+  const [drivers, setDrivers] = useState<Driver[]>(D.drivers);
+  const [results, setResults] = useState<Result[]>(D.results);
+
+  useEffect(() => {
+    fetch(`${import.meta.env.VITE_API_URL}/api/races?season=2025`)
+      .then(r => r.json())
+      .then(data => {
+        const adapted = data.races.map(adaptRace);
+        if (adapted.length > 0) setRaces(adapted);
+      })
+      .catch(() => {}); // silently keep mock data if backend is offline
+  }, []);
+
+  const race = races.find(r => r.round === activeRound && r.year === activeYear) ?? races[0];
+  const [lap, setLap] = useState(1);
+
+  // When a race is picked, fetch real lap count + drivers
+  useEffect(() => {
+    if (!race?.session_key) return;
+    const key = race.session_key;
+    const base = import.meta.env.VITE_API_URL;
+
+    // Fetch total laps
+    fetch(`${base}/api/total-laps?session_key=${key}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.total_laps) {
+          setRaces(prev => prev.map(r =>
+            r.session_key === key ? { ...r, laps: data.total_laps } : r
+          ));
+        }
+      })
+      .catch(() => {});
+
+    // Fetch real drivers
+    fetch(`${base}/api/drivers?session_key=${key}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.drivers?.length) {
+          setDrivers(data.drivers.map(adaptDriver));
+        }
+      })
+      .catch(() => {});
+
+    // Fetch laps + tyres in parallel, then combine
+    Promise.all([
+      fetch(`${base}/api/laps?session_key=${key}`).then(r => r.json()),
+      fetch(`${base}/api/tyres?session_key=${key}`).then(r => r.json()),
+      fetch(`${base}/api/drivers?session_key=${key}`).then(r => r.json()),
+    ])
+      .then(([lapData, tyreData, driverData]) => {
+        const numToCode: Record<number, string> = {};
+        (driverData.drivers ?? []).forEach((d: any) => {
+          numToCode[d.driver_number] = d.name_acronym;
+        });
+
+        if (lapData.laps?.length) {
+          const { chartData, rankings } = processRealLapData(lapData.laps, numToCode);
+          let realResults = buildResultsFromLaps(lapData.laps, numToCode, rankings);
+
+          // Merge real tyre/stop data into results
+          if (tyreData.stints?.length) {
+            const stints = processStintData(tyreData.stints, numToCode, race.laps);
+            setStintsByCode(stints);
+            realResults = realResults.map(r => {
+              const s = stints[r.code] ?? [];
+              return {
+                ...r,
+                tyres: s.map(st => st.compound),
+                stops: Math.max(0, s.length - 1),
+              };
+            });
+          }
+
+          setChartData(chartData);
+          setRankings(rankings);
+          setResults(realResults);
+        }
+      })
+      .catch(() => {});
+  }, [race?.session_key]);
+
   const [selectedCode, setSelectedCode] = useState('VER');
 
   useEffect(() => {
     if (lap > race.laps) setLap(Math.min(lap, race.laps));
   }, [race.laps]);
 
-  const { rankings } = useMemo(
-    () => generateLapData(D.results, race.laps),
-    [race.laps]
-  );
+  // Start with mock data, replaced by real data when a race is fetched
+  const mockLapData = useMemo(() => generateLapData(D.results, race.laps), [race.laps]);
+  const [chartData, setChartData] = useState<LapEntry[]>(mockLapData.chartData);
+  const [rankings, setRankings]   = useState<LapRanking[]>(mockLapData.rankings);
+  const [stintsByCode, setStintsByCode] = useState<Record<string, Stint[]>>({});
 
-  const leader = D.results[0];
+  // Reset to mock data when race changes before real data arrives
+  useEffect(() => {
+    setChartData(mockLapData.chartData);
+    setRankings(mockLapData.rankings);
+    setResults(D.results);
+    setStintsByCode({});
+  }, [race?.session_key]);
+
+  const leader = results[0];
 
   return (
     <div className="app">
@@ -65,12 +208,12 @@ export default function App() {
         race={race}
         currentLap={lap}
         totalLaps={race.laps}
-        races={D.races}
+        races={races}
         onChangeRace={r => { setActiveRound(r.round); setActiveYear(r.year); }}
       />
       <div className="shell">
         <Sidebar
-          races={D.races}
+          races={races}
           activeRound={activeRound}
           activeYear={activeYear}
           onPick={r => { setActiveRound(r.round); setActiveYear(r.year); }}
@@ -96,27 +239,29 @@ export default function App() {
           <div id="map-classi" className='panel flex 2xl:!flex-row'>
             <TrackMap track={race.track} year={activeYear} />
             <Classification
-              results={D.results} drivers={D.drivers}
+              results={results} drivers={drivers}
               selectedCode={selectedCode} onSelect={setSelectedCode}
               rankings={rankings} currentLap={lap} />
           </div>
           
           <LapChart
-            results={D.results} drivers={D.drivers}
+            results={results} drivers={drivers}
+            chartData={chartData}
             totalLaps={race.laps} currentLap={lap}
             selectedCode={selectedCode} />
           <TyreStrategy
-            results={D.results} drivers={D.drivers}
+            results={results} drivers={drivers}
             totalLaps={race.laps} currentLap={lap}
             rankings={rankings}
+            stintsByCode={stintsByCode}
             selectedCode={selectedCode} onSelect={setSelectedCode} />
 
           <BottomRaceDrawer
             
             race={race}
             currentLap={lap}
-            results={D.results}
-            drivers={D.drivers}
+            results={results}
+            drivers={drivers}
             rankings={rankings}
           />
           

@@ -1,4 +1,3 @@
-
 """
 services/openf1.py
 
@@ -6,104 +5,139 @@ Data layer — all OpenF1 API requests live here.
 Routers never call OpenF1 directly; they only call functions in this module.
 
 Caching strategy:
-  Now:   functools.lru_cache (in-process memory cache, sufficient for development)
-  Later: swap in Redis by changing only this file; routers stay untouched
+  Static data (races, drivers):  lru_cache — never expires, data never changes
+  Live data (laps, positions, tyres, pit stops): TTL cache — expires after N seconds
+    - Positions: 10s  (updates every few seconds during live race)
+    - Laps:      30s  (new lap every ~90s, 30s gives a reasonable refresh window)
+    - Tyres/Pits: 60s (only changes on pit stops)
 """
 
+import time
 import httpx
 from functools import lru_cache
+from typing import Any, Callable
 
 BASE = "https://api.openf1.org/v1"
 
 
+# ── HTTP ──────────────────────────────────────────────────────────────────────
+
 def _get(endpoint: str, params: dict) -> list:
-    """
-    Single HTTP entry point for all requests.
-    Adding Redis caching later only requires changing this function.
-    """
     response = httpx.get(f"{BASE}/{endpoint}", params=params, timeout=30.0)
     response.raise_for_status()
     return response.json()
 
 
-@lru_cache(maxsize=64)
-def get_session_key(season: int, circuit: str) -> int:
+# ── TTL cache ─────────────────────────────────────────────────────────────────
+
+_ttl_store: dict[str, tuple[Any, float]] = {}
+
+
+def _ttl_get(key: str, fetch_fn: Callable, ttl: int) -> Any:
     """
-    Resolves (season, circuit slug) to an OpenF1 session_key.
-    All other functions depend on this, so caching is especially important.
-
-    circuit format: lowercase English, e.g. "monaco" / "silverstone" / "suzuka"
+    Return cached value if still fresh, otherwise call fetch_fn, store, and return.
+    ttl: seconds before the cached value is considered stale
     """
-    sessions = _get("sessions", {
-        "year": season,
-        "session_name": "Race",
-        "country_name": circuit,
-    })
+    now = time.time()
+    if key in _ttl_store:
+        value, expires_at = _ttl_store[key]
+        if now < expires_at:
+            return value
 
-    if not sessions:
-        raise ValueError(f"No race data found for {circuit} in the {season} season")
+    value = fetch_fn()
+    _ttl_store[key] = (value, now + ttl)
+    return value
 
-    return sessions[0]["session_key"]
 
+def _ttl_invalidate(key: str) -> None:
+    """Force-expire a cache entry so the next call fetches fresh data."""
+    _ttl_store.pop(key, None)
+
+
+# ── Static data — lru_cache (never changes once a session is over) ────────────
 
 @lru_cache(maxsize=16)
-def get_races(season: int) -> list[dict]:
-    """
-    Returns all race sessions for a given season.
-    Route: GET /races?season=2023
-    """
+def get_races(season: int) -> list:
+    """All race sessions for a given season."""
     return _get("sessions", {
         "year": season,
         "session_name": "Race",
     })
 
 
+@lru_cache(maxsize=64)
+def get_session_key(season: int, circuit: str) -> int:
+    """Resolve (season, circuit slug) → OpenF1 session_key."""
+    sessions = _get("sessions", {
+        "year": season,
+        "session_name": "Race",
+        "country_name": circuit,
+    })
+    if not sessions:
+        raise ValueError(f"No race found for {circuit} {season}")
+    return sessions[0]["session_key"]
+
+
 @lru_cache(maxsize=32)
-def get_drivers(session_key: int) -> list[dict]:
-    """
-    Returns all driver info for a session.
-    Route: GET /drivers?session_key=9158
-    """
+def get_drivers(session_key: int) -> list:
+    """Driver info for a session — static, never changes."""
     return _get("drivers", {"session_key": session_key})
 
 
-@lru_cache(maxsize=32)
-def get_lap_times(session_key: int, driver_number: int = None) -> list[dict]:
+# ── Live data — TTL cache (stale data = wrong live standings) ─────────────────
+
+def get_lap_times(session_key: int, driver_number: int = None) -> list:
     """
-    Returns lap timing data, optionally filtered by driver number.
-    Route: GET /laps?session_key=9158&driver_number=1
+    Lap timing data. Refreshes every 30s during a live race.
+    A new lap completes every ~90s so 30s gives at most one missed lap.
     """
+    key = f"laps_{session_key}_{driver_number}"
     params = {"session_key": session_key}
     if driver_number is not None:
         params["driver_number"] = driver_number
-    return _get("laps", params)
+    return _ttl_get(key, lambda: _get("laps", params), ttl=30)
 
 
-@lru_cache(maxsize=32)
-def get_tyre_strategy(session_key: int) -> list[dict]:
+def get_total_laps(session_key: int):
     """
-    Returns tyre stint data for all drivers (pit lap, compound, stint length).
-    Route: GET /tyres?session_key=9158
+    Derive total laps from the highest lap_number in the session.
+    Works correctly for finished races.
+    For a live race this returns the current lap, not the final total —
+    caller should fall back to a known circuit lap count in that case.
+    Returns None if no lap data is available yet (session hasn't started).
     """
-    return _get("stints", {"session_key": session_key})
+    key = f"total_laps_{session_key}"
+    def fetch():
+        laps = _get("laps", {"session_key": session_key})
+        if not laps:
+            return None
+        return max(lap["lap_number"] for lap in laps if lap.get("lap_number"))
+    return _ttl_get(key, fetch, ttl=30)
 
 
-@lru_cache(maxsize=32)
-def get_pit_stops(session_key: int) -> list[dict]:
+def get_tyre_strategy(session_key: int) -> list:
     """
-    Returns all pit stop data (pit lap, stop duration).
-    Route: GET /pitstops?session_key=9158
+    Tyre stint data. Refreshes every 60s — only changes on pit stops.
     """
-    return _get("pit", {"session_key": session_key})
+    key = f"tyres_{session_key}"
+    return _ttl_get(key, lambda: _get("stints", {"session_key": session_key}), ttl=60)
 
 
-@lru_cache(maxsize=32)
-def get_position(session_key: int, driver_number: int = None) -> list[dict]:
+def get_pit_stops(session_key: int) -> list:
     """
-    Returns car position data, optionally filtered by driver number.
-    Route: GET /position?session_key=9158&driver_number=1
+    Pit stop data. Refreshes every 60s — only changes on pit stops.
     """
+    key = f"pits_{session_key}"
+    return _ttl_get(key, lambda: _get("pit", {"session_key": session_key}), ttl=60)
+
+
+def get_position(session_key: int, driver_number: int = None) -> list:
+    """
+    Car position data. Refreshes every 10s — positions change frequently.
+    """
+    key = f"position_{session_key}_{driver_number}"
     params = {"session_key": session_key}
     if driver_number is not None:
         params["driver_number"] = driver_number
-    return _get("position", params)
+    return _ttl_get(key, lambda: _get("position", params), ttl=10)
+

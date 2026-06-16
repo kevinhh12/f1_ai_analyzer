@@ -24,19 +24,18 @@ export default function Classification({ results, drivers, selectedCode, onSelec
   const currentLapIndex = currentLap - 1;
   const currentRanking = rankings[currentLapIndex];
 
-  let liveOrder;
+  const rankedOrder: { code: string; pos: number; gapMs: number }[] = currentRanking
+    ? currentRanking.order
+    : results.map((r, i) => ({ code: r.code, pos: i + 1, gapMs: 0 }));
 
-  if (currentRanking) { // if ranking available, sort it, if not return default value 
-    liveOrder = currentRanking.order;
-  } else {
-    liveOrder = results.map((result, index) => {
-      return {
-        code: result.code,
-        pos: index + 1,
-        gapMs: 0,
-      };
-    });
-  }
+  // Append any drivers that exist in results but are missing from the live ranking
+  // (drivers with no lap data: DNS, immediate DNF, data gaps)
+  const rankedCodes = new Set(rankedOrder.map(o => o.code));
+  const unrankedRows = results
+    .filter(r => !rankedCodes.has(r.code))
+    .map((r, i) => ({ code: r.code, pos: rankedOrder.length + i + 1, gapMs: -1 }));
+
+  const liveOrder = [...rankedOrder, ...unrankedRows];
 
   return (
     <section id="classification" className='panel classification-scroll f1-hover'>

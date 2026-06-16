@@ -1564,6 +1564,31 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* DNF badge — appears after the last tyre segment or alone for no-data drivers */
+.strat-dnf-badge {
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: 3px;
+  font: 700 9px var(--font-sans);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: #fff;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: 6px;
+  opacity: 0.9;
+}
+
+/* Dim the whole row for retired drivers */
+.strat-row--dnf {
+  opacity: 0.6;
+}
+.strat-row--dnf:hover,
+.strat-row--dnf.sel {
+  opacity: 1;
+}
+
 .strat-legend {
   display: flex;
   gap: 14px;

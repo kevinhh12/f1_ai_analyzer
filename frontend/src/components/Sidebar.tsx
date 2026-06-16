@@ -8,6 +8,8 @@ interface Props {
   onPick: (race: Race) => void;
 }
 
+
+
 export default function Sidebar({ races, activeRound, activeYear, onPick }: Props) {
   const filteredRaces = races.filter(r => r.year === activeYear);
 

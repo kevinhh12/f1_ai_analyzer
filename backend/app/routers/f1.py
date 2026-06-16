@@ -19,6 +19,7 @@ from app.services.openf1 import (
     get_pit_stops,
     get_position,
     get_session_key,
+    get_total_laps,
 )
 from app.services.ai import ask
 
@@ -187,6 +188,22 @@ def get_session(season: int, circuit: str):
         return {"season": season, "circuit": circuit, "session_key": key}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/total-laps")
+def total_laps(session_key: int):
+    """
+    Return the total lap count for a session derived from actual lap data.
+    For finished races this is the exact race distance.
+    For live races this is the current lap — use LAPS_BY_CIRCUIT as a fallback.
+
+    Example: GET /total-laps?session_key=9158
+    """
+    try:
+        laps = get_total_laps(session_key)
+        return {"session_key": session_key, "total_laps": laps}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

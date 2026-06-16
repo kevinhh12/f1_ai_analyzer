@@ -2,12 +2,13 @@
 
 import { useMemo } from "react"
 import { CartesianGrid, Line, LineChart, ReferenceLine, XAxis, YAxis, Tooltip } from "recharts"
-import { type Driver, type Result, generateLapData, msToLabel, msToAxisTick } from '../data';
+import { type Driver, type Result, type LapEntry, msToLabel, msToAxisTick } from '../data';
 import { ChartContainer, type ChartConfig } from "../components/ui/chart"
 
 interface Props {
   results: Result[];
   drivers: Driver[];
+  chartData: LapEntry[];
   selectedCode: string;
   totalLaps: number;
   currentLap: number;
@@ -36,13 +37,8 @@ function LapTooltip({ active, payload, label, drivers, selectedCode }: any) {
   );
 }
 
-export default function LapChart({ results, drivers, selectedCode, totalLaps, currentLap }: Props) {
+export default function LapChart({ results, drivers, chartData: allLapData, selectedCode, totalLaps, currentLap }: Props) {
   const byCode = Object.fromEntries(drivers.map(d => [d.code, d]));
-
-  const { chartData: allLapData } = useMemo(
-    () => generateLapData(results, totalLaps),
-    [results, totalLaps]
-  );
 
   // Only show laps up to currentLap — chart grows as the race progresses
   const chartData = allLapData.slice(0, currentLap);
