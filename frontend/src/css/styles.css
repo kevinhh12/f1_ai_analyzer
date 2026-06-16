@@ -832,6 +832,100 @@ body {
   color: var(--fg-muted);
 }
 
+.app--loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Full-screen boot loader (races not yet fetched) ── */
+.loading-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.loading-logo {
+  font: 900 56px var(--font-sans);
+  letter-spacing: -.02em;
+  color: #e10600;
+}
+
+.loading-label {
+  font: 600 11px var(--font-mono);
+  letter-spacing: .14em;
+  color: var(--fg-dim);
+  margin: 0;
+}
+
+/* ── Animated progress bar (shared) ── */
+.loading-bar {
+  width: 200px;
+  height: 2px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.loading-bar-fill {
+  height: 100%;
+  width: 40%;
+  background: #e10600;
+  border-radius: 2px;
+  animation: loading-sweep 1.4s ease-in-out infinite;
+}
+
+@keyframes loading-sweep {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(600%); }
+}
+
+/* ── Canvas overlay loader (race data fetching) ── */
+.canvas-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.canvas-loader-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.cl-flag {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  line-height: 1;
+}
+
+.cl-race {
+  font: 700 18px var(--font-sans);
+  letter-spacing: .04em;
+  color: var(--fg);
+  margin: 0;
+}
+
+.cl-sub {
+  font: 600 10px var(--font-mono);
+  letter-spacing: .14em;
+  color: var(--fg-dim);
+  margin: 0;
+}
+
 /* ---------- TOP BAR ---------- */
 
 .topbar {
@@ -1224,6 +1318,21 @@ body {
   color: var(--fg-faint);
 }
 
+.stat-compound {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 3px;
+  font: 700 9px var(--font-sans);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.stat-v--empty {
+  color: var(--fg-subtle);
+}
+
 /* ---------- PANEL ---------- */
 
 .panel {
@@ -1360,6 +1469,10 @@ body {
   box-shadow: inset 0 0 0 1px rgba(225,6,0,.45);
 }
 
+.cl-row.fl {
+  background: rgba(168,85,247,.06);
+}
+
 .cl-row.lead .cl-h.pos {
   color: #e10600;
 }
@@ -1409,16 +1522,22 @@ body {
 
 .cl-row .cl-h.tyre {
   display: flex;
-  gap: 4px;
+  flex-wrap: wrap;
+  gap: 3px;
+  align-content: center;
 }
 
-.t-dot {
-  width: 12px;
-  height: 12px;
+.t-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
   border-radius: 50%;
-  border: 2.5px solid;
-  background: var(--bg);
-  box-sizing: border-box;
+  font: 800 9px var(--font-sans);
+  letter-spacing: 0;
+  flex-shrink: 0;
+  line-height: 1;
 }
 
 .cl-row .cl-h.stops {
@@ -1640,6 +1759,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .play {
@@ -1661,7 +1781,7 @@ body {
   letter-spacing: .18em;
   text-transform: uppercase;
   color: var(--fg-subtle);
-  min-width: 50px;
+  min-width: 28px;
 }
 
 .scrubber input[type=range] {

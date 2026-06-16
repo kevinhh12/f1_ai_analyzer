@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import './css/styles.css';
-import { F1_DATA, generateLapData, processRealLapData, buildResultsFromLaps, processStintData, type Race, type Driver, type Result, type LapEntry, type LapRanking, type Stint } from './data';
+import { processRealLapData, buildResultsFromLaps, processStintData, type Race, type Driver, type Result, type LapEntry, type LapRanking, type Stint } from './data';
 
 
 const LAPS_BY_CIRCUIT: Record<string, number> = {
@@ -54,6 +54,19 @@ function adaptRace(session: any, index: number): Race {
     session_key: session.session_key,
   };
 }
+
+const FLAG: Record<string, string> = {
+  'Australia': '🇦🇺', 'Austria': '🇦🇹', 'Azerbaijan': '🇦🇿',
+  'Bahrain': '🇧🇭', 'Belgium': '🇧🇪', 'Brazil': '🇧🇷',
+  'Canada': '🇨🇦', 'China': '🇨🇳', 'France': '🇫🇷',
+  'Hungary': '🇭🇺', 'Italy': '🇮🇹', 'Japan': '🇯🇵',
+  'Mexico': '🇲🇽', 'Monaco': '🇲🇨', 'Netherlands': '🇳🇱',
+  'Qatar': '🇶🇦', 'Saudi Arabia': '🇸🇦', 'Singapore': '🇸🇬',
+  'Spain': '🇪🇸', 'United Arab Emirates': '🇦🇪',
+  'United Kingdom': '🇬🇧', 'United States': '🇺🇸',
+};
+const countryFlag = (name: string) => FLAG[name] ?? '🏁';
+
 import Classification from './components/Classification';
 import LapChart from './components/LapChart';
 import StatGrid from './components/StatGrid';
@@ -93,13 +106,82 @@ function Scrubber({ totalLaps, lap, onChange }: ScrubberProps) {
   );
 }
 
+function fmtMs(ms: number) {
+  const m = Math.floor(ms / 60000);
+  const s = ((ms % 60000) / 1000).toFixed(3).padStart(6, '0');
+  return `${m}:${s}`;
+}
+
+interface CanvasHeadProps {
+  race: Race; activeYear: number; lap: number;
+  rankings: LapRanking[]; chartData: LapEntry[]; drivers: Driver[];
+}
+
+function CanvasHead({ race, activeYear, lap, rankings, chartData, drivers }: CanvasHeadProps) {
+  const byCode = Object.fromEntries(drivers.map(d => [d.code, d]));
+
+  const leaderCode = rankings[lap - 1]?.order[0]?.code ?? null;
+  const leaderColor = leaderCode ? (byCode[leaderCode]?.color ?? '#e10600') : '#e10600';
+
+  const fastestLap = useMemo(() => {
+    let bestMs = Infinity, bestCode = '';
+    for (const entry of chartData) {
+      for (const [key, val] of Object.entries(entry)) {
+        if (key === 'lap' || key.endsWith('_pos') || key.endsWith('_gap')) continue;
+        if (typeof val === 'number' && val > 0 && val < 120000 && val < bestMs) {
+          bestMs = val; bestCode = key;
+        }
+      }
+    }
+    return bestCode ? { time: fmtMs(bestMs), code: bestCode } : null;
+  }, [chartData]);
+
+  const flColor = fastestLap ? (byCode[fastestLap.code]?.color ?? '#a855f7') : '#a855f7';
+
+  return (
+    <header className="canvas-head">
+      <div id="summary" className="title">
+        <span className="eb">{activeYear} · ROUND {String(race.round).padStart(2, '0')} · {race.country}</span>
+        <span className="nm">{race.name.toUpperCase()} — RACE</span>
+      </div>
+      <div className="meta">
+        <div className="item">
+          <span className="lbl">DISTANCE</span>
+          <span className="v">{race.laps} LAPS</span>
+        </div>
+        <div className="item">
+          <span className="lbl">LEADER</span>
+          <span className="v" style={{ color: leaderColor }}>{leaderCode ?? '—'}</span>
+        </div>
+        <div className="item">
+          <span className="lbl">FASTEST</span>
+          <span className="v" style={{ color: fastestLap ? flColor : undefined }}>
+            {fastestLap ? fastestLap.time : '—'}
+          </span>
+        </div>
+      </div>
+    </header>
+  );
+}
+
 export default function App() {
-  const D = F1_DATA;
   const [activeRound, setActiveRound] = useState(1);
   const [activeYear, setActiveYear] = useState(2025);
-  const [races, setRaces] = useState<Race[]>(D.races);
-  const [drivers, setDrivers] = useState<Driver[]>(D.drivers);
-  const [results, setResults] = useState<Result[]>(D.results);
+  const [savedSessionKey] = useState(() => {
+    const v = localStorage.getItem('f1_session_key');
+    return v ? Number(v) : null;
+  });
+
+  const pickRace = (r: Race) => {
+    setActiveRound(r.round);
+    setActiveYear(r.year);
+    if (r.session_key) localStorage.setItem('f1_session_key', String(r.session_key));
+  };
+
+  const [races, setRaces] = useState<Race[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [results, setResults] = useState<Result[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch(`${import.meta.env.VITE_API_URL}/api/races?season=2025`)
@@ -108,11 +190,30 @@ export default function App() {
         const adapted = data.races.map(adaptRace);
         if (adapted.length > 0) setRaces(adapted);
       })
-      .catch(() => {}); // silently keep mock data if backend is offline
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
+
+  // Restore the previously selected race by session_key — only once on first load
+  const didRestore = useRef(false);
+  useEffect(() => {
+    if (!savedSessionKey || races.length === 0 || didRestore.current) return;
+    didRestore.current = true;
+    const saved = races.find(r => r.session_key === savedSessionKey);
+    if (saved) {
+      setActiveRound(saved.round);
+      setActiveYear(saved.year);
+    }
+  }, [races]);
 
   const race = races.find(r => r.round === activeRound && r.year === activeYear) ?? races[0];
   const [lap, setLap] = useState(1);
+
+  const [chartData, setChartData] = useState<LapEntry[]>([]);
+  const [rankings, setRankings]   = useState<LapRanking[]>([]);
+  const [stintsByCode, setStintsByCode] = useState<Record<string, Stint[]>>({});
+  const [pitStops, setPitStops] = useState<any[]>([]);
+  const [dataLoading, setDataLoading] = useState(false);
 
   // When a race is picked, fetch real lap count + drivers
   useEffect(() => {
@@ -142,20 +243,35 @@ export default function App() {
       })
       .catch(() => {});
 
-    // Fetch laps + tyres in parallel, then combine
+    // Fetch laps + tyres + pitstops + positions in parallel, then combine
+    setDataLoading(true);
     Promise.all([
       fetch(`${base}/api/laps?session_key=${key}`).then(r => r.json()),
       fetch(`${base}/api/tyres?session_key=${key}`).then(r => r.json()),
       fetch(`${base}/api/drivers?session_key=${key}`).then(r => r.json()),
+      fetch(`${base}/api/pitstops?session_key=${key}`).then(r => r.json()),
+      fetch(`${base}/api/position?session_key=${key}`).then(r => r.json()),
     ])
-      .then(([lapData, tyreData, driverData]) => {
+      .then(([lapData, tyreData, driverData, pitData, posData]) => {
+        if (pitData.pit_stops?.length) setPitStops(pitData.pit_stops);
         const numToCode: Record<number, string> = {};
         (driverData.drivers ?? []).forEach((d: any) => {
           numToCode[d.driver_number] = d.name_acronym;
         });
 
         if (lapData.laps?.length) {
-          const { chartData, rankings } = processRealLapData(lapData.laps, numToCode);
+          const rawPositions = posData.positions ?? [];
+          const { chartData, rankings } = processRealLapData(lapData.laps, numToCode, rawPositions);
+
+          // OpenF1 often omits the final lap for all/some drivers — pad to race.laps
+          // so the scrubber's last position shows correct final standings.
+          while (chartData.length < race.laps && chartData.length > 0) {
+            const last = chartData[chartData.length - 1];
+            chartData.push({ ...last, lap: chartData.length + 1 });
+            const lastR = rankings[rankings.length - 1];
+            rankings.push({ ...lastR, lap: rankings.length + 1 });
+          }
+
           let realResults = buildResultsFromLaps(lapData.laps, numToCode, rankings);
 
           // Merge real tyre/stop data into results
@@ -177,30 +293,56 @@ export default function App() {
           setResults(realResults);
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setDataLoading(false));
   }, [race?.session_key]);
 
-  const [selectedCode, setSelectedCode] = useState('VER');
+  const [selectedCode, setSelectedCode] = useState('');
 
   useEffect(() => {
-    if (lap > race.laps) setLap(Math.min(lap, race.laps));
-  }, [race.laps]);
+    if (race && lap > race.laps) setLap(Math.min(lap, race.laps));
+  }, [race?.laps]);
 
-  // Start with mock data, replaced by real data when a race is fetched
-  const mockLapData = useMemo(() => generateLapData(D.results, race.laps), [race.laps]);
-  const [chartData, setChartData] = useState<LapEntry[]>(mockLapData.chartData);
-  const [rankings, setRankings]   = useState<LapRanking[]>(mockLapData.rankings);
-  const [stintsByCode, setStintsByCode] = useState<Record<string, Stint[]>>({});
+  // Driver who holds the fastest lap up to the current scrubber position
+  const fastestLapCode = useMemo(() => {
+    let bestMs = Infinity, bestCode = '';
+    const limit = Math.min(lap, chartData.length);
+    for (let i = 0; i < limit; i++) {
+      const entry = chartData[i];
+      for (const [key, val] of Object.entries(entry)) {
+        if (key === 'lap' || key.endsWith('_pos') || key.endsWith('_gap')) continue;
+        if (typeof val === 'number' && val > 0 && val < 120000 && val < bestMs) {
+          bestMs = val; bestCode = key;
+        }
+      }
+    }
+    return bestCode || null;
+  }, [chartData, lap]);
 
-  // Reset to mock data when race changes before real data arrives
+  // Clear state when switching races; set scrubber to last lap for historical races
   useEffect(() => {
-    setChartData(mockLapData.chartData);
-    setRankings(mockLapData.rankings);
-    setResults(D.results);
+    setChartData([]);
+    setRankings([]);
+    setResults([]);
     setStintsByCode({});
+    setPitStops([]);
+    if (race) {
+      const today = new Date().toISOString().slice(0, 10);
+      setLap(race.date < today ? race.laps : 1);
+    }
   }, [race?.session_key]);
 
-  const leader = results[0];
+  if (loading || !race) {
+    return (
+      <div className="app app--loading">
+        <div className="loading-screen">
+          <div className="loading-logo">F1</div>
+          <p className="loading-label">CONNECTING TO TIMING DATA</p>
+          <div className="loading-bar"><div className="loading-bar-fill" /></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app">
@@ -209,39 +351,51 @@ export default function App() {
         currentLap={lap}
         totalLaps={race.laps}
         races={races}
-        onChangeRace={r => { setActiveRound(r.round); setActiveYear(r.year); }}
+        onChangeRace={pickRace}
       />
       <div className="shell">
         <Sidebar
           races={races}
           activeRound={activeRound}
           activeYear={activeYear}
-          onPick={r => { setActiveRound(r.round); setActiveYear(r.year); }}
+          onPick={pickRace}
         />
 
         <main className="canvas">
-          <header className="canvas-head">
-            <div id="summary" className="title">
-              <span className="eb">{activeYear} · ROUND {String(race.round).padStart(2, '0')} · {race.country}</span>
-              <span className="nm">{race.name.toUpperCase()} — RACE</span>
+          {dataLoading && (
+            <div className="canvas-loader">
+              <div className="canvas-loader-inner">
+                <div className="cl-flag">
+                  {countryFlag(race.country)}
+                </div>
+                <p className="cl-race">{race.name.toUpperCase()}</p>
+                <p className="cl-sub">LOADING RACE DATA</p>
+                <div className="loading-bar"><div className="loading-bar-fill" /></div>
+              </div>
             </div>
-            <div className="meta">
-              <div className="item"><span className="lbl">DISTANCE</span><span className="v">{race.laps} LAPS</span></div>
-              <div className="item"><span className="lbl">WINNER</span><span className="v" style={{color:'#e10600'}}>VER</span></div>
-              <div className="item"><span className="lbl">FASTEST</span><span className="v">1:14.260</span></div>
-            </div>
-          </header>
+          )}
+          <CanvasHead
+            race={race} activeYear={activeYear}
+            lap={lap} rankings={rankings}
+            chartData={chartData} drivers={drivers}
+          />
 
      
           <Scrubber totalLaps={race.laps} lap={lap} onChange={setLap} />
           
-          <StatGrid leader={leader} />
+          <StatGrid
+            chartData={chartData} stintsByCode={stintsByCode}
+            pitStops={pitStops} rankings={rankings}
+            currentLap={lap} results={results} drivers={drivers}
+          />
           <div id="map-classi" className='panel flex 2xl:!flex-row'>
             <TrackMap track={race.track} year={activeYear} />
             <Classification
               results={results} drivers={drivers}
               selectedCode={selectedCode} onSelect={setSelectedCode}
-              rankings={rankings} currentLap={lap} />
+              rankings={rankings} currentLap={lap}
+              stintsByCode={stintsByCode}
+              fastestLapCode={fastestLapCode} />
           </div>
           
           <LapChart

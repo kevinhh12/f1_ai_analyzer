@@ -1,4 +1,4 @@
-import { type Driver, type Result, type LapRanking, formatGap } from '../data';
+import { type Driver, type Result, type LapRanking, type Stint, formatGap } from '../data';
 
 const TYRES: Record<string, string> = {
   S: '#ff2e2e', M: '#ffd400', H: '#f3f3f3', I: '#00d27a', W: '#2bb6ff',
@@ -11,16 +11,16 @@ interface Props {
   onSelect: (code: string) => void;
   rankings: LapRanking[];
   currentLap: number;
+  stintsByCode: Record<string, Stint[]>;
+  fastestLapCode?: string | null;
 }
 
-export default function Classification({ results, drivers, selectedCode, onSelect, rankings, currentLap }: Props) {
-  // Build lookup tables for drivers and results by code for easy access
+export default function Classification({ results, drivers, selectedCode, onSelect, rankings, currentLap, stintsByCode, fastestLapCode }: Props) {
   const byCode = Object.fromEntries(drivers.map(d => [d.code, d]));
   const resultByCode = Object.fromEntries(results.map(r => [r.code, r]));
   const teamLogoURL = (team: string) =>
     `https://media.formula1.com/image/upload/c_lfill,w_48/q_auto/v1740000001/common/f1/2026/${team.toLowerCase().replace(/\s/g, '')}/2026${team.toLowerCase().replace(/\s/g, '')}logowhite.webp`;
 
-  // Live ranking at currentLap, fall back to final results order
   const currentLapIndex = currentLap - 1;
   const currentRanking = rankings[currentLapIndex];
 
@@ -28,8 +28,6 @@ export default function Classification({ results, drivers, selectedCode, onSelec
     ? currentRanking.order
     : results.map((r, i) => ({ code: r.code, pos: i + 1, gapMs: 0 }));
 
-  // Append any drivers that exist in results but are missing from the live ranking
-  // (drivers with no lap data: DNS, immediate DNF, data gaps)
   const rankedCodes = new Set(rankedOrder.map(o => o.code));
   const unrankedRows = results
     .filter(r => !rankedCodes.has(r.code))
@@ -54,27 +52,29 @@ export default function Classification({ results, drivers, selectedCode, onSelec
           const r = resultByCode[code];
           if (!r) return null;
           const driverInfo = byCode[code];
-          let d;
+          const d = driverInfo ?? { team: '—', color: '#3f434c', name: code, num: r.num, code };
 
-          if (driverInfo) { // if driver info available, use it, if not return default value
-            d = driverInfo;
-          } else {
-            d = {
-              team: '—',
-              color: '#3f434c',
-              name: code,
-              num: r.num,
-              code: code,
-            };
-          }
-          const sel = code === selectedCode; // whether this driver is currently selected
-          const lead = pos === 1; // if this driver is leading, highlight them and show "P1" instead of position number
+          const sel = code === selectedCode;
+          const lead = pos === 1;
+          const hasFastestLap = code === fastestLapCode;
+
+          // Stints used up to currentLap — from real data if available, fall back to r.tyres
+          const realStints = stintsByCode[code];
+          const usedCompounds: string[] = realStints
+            ? realStints.filter(s => s.startLap <= currentLap).map(s => s.compound)
+            : r.tyres.slice(0, r.stops + 1);
+
+          // Pit count = stints started so far minus 1
+          const livePits = realStints
+            ? Math.max(0, realStints.filter(s => s.startLap <= currentLap).length - 1)
+            : r.stops;
+
           return (
             <button
               key={code}
-              className={"cl-row" + (lead ? " lead" : "") + (sel ? " sel" : "")}
+              className={"cl-row" + (lead ? " lead" : "") + (sel ? " sel" : "") + (hasFastestLap ? " fl" : "")}
               onClick={() => onSelect(code)}
-              style={{ borderLeftColor: d.color }}
+              style={{ borderLeftColor: hasFastestLap ? '#a855f7' : d.color }}
             >
               <span className="cl-h pos">{lead ? 'P1' : pos}</span>
               <span className="cl-h num">{d.num ?? r.num}</span>
@@ -87,11 +87,21 @@ export default function Classification({ results, drivers, selectedCode, onSelec
               </div>
               <span className="cl-h best">{r.best}</span>
               <span className="cl-h tyre">
-                {r.tyres.map((t, i) => (
-                  <span key={i} className="t-dot" style={{ borderColor: TYRES[t] }} />
+                {usedCompounds.map((t, i) => (
+                  <span
+                    key={i}
+                    className="t-chip"
+                    title={t === 'S' ? 'SOFT' : t === 'M' ? 'MEDIUM' : t === 'H' ? 'HARD' : t === 'I' ? 'INTER' : 'WET'}
+                    style={{
+                      background: TYRES[t],
+                      color: t === 'M' || t === 'H' ? '#0a0b0d' : '#fff',
+                    }}
+                  >
+                    {t}
+                  </span>
                 ))}
               </span>
-              <span className="cl-h stops">{r.stops}</span>
+              <span className="cl-h stops">{livePits}</span>
               <span className="cl-h gap">{formatGap(gapMs)}</span>
             </button>
           );
