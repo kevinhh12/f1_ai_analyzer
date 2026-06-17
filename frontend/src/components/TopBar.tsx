@@ -13,7 +13,7 @@ interface Props {
 
 export default function TopBar({ race, currentLap, totalLaps, onChangeRace, races }: Props) {
   const [open, setOpen] = useState(false);
-  const years = [...new Set(races.map(r => r.year))];
+  const years = [...new Set(races.map(r => r.year))].sort((a, b) => b - a);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -79,11 +79,11 @@ export default function TopBar({ race, currentLap, totalLaps, onChangeRace, race
                 <button className="dropdown-back" onClick={() => setSelectedYear(null)}>
                   ‹ {selectedYear}
                 </button>
-                <div className="dropdown-races">
+                <div className="dropdown-races ">
                   {filteredRaces.map(r => (
                     <button
                       key={r.round}
-                      className={'dropdown-row' + (r.round === race.round && r.year === race.year ? ' active' : '')}
+                      className={'dropdown-row ' + (r.round === race.round && r.year === race.year ? ' active' : '')}
                       onClick={() => { onChangeRace(r); setOpen(false); setSelectedYear(null); }}
                     >
                       <span className="rd">R{String(r.round).padStart(2, '0')}</span>

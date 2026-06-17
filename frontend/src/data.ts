@@ -1,14 +1,19 @@
 export type TyreCompound = 'S' | 'M' | 'H' | 'I' | 'W';
 
+
+// ── Data Models & Processing Functions ─────────────────────────────────────────
 export interface Stint {
   compound: TyreCompound;
   startLap: number; // 1-indexed, inclusive
   endLap: number;   // 1-indexed, inclusive
 }
 
+// Macros
 const COMPOUND_MAP: Record<string, TyreCompound> = {
   SOFT: 'S', MEDIUM: 'M', HARD: 'H', INTERMEDIATE: 'I', WET: 'W',
 };
+
+// Convert raw stint data from OpenF1 API into structured stints by driver code
 
 export function processStintData(
   rawStints: any[],

@@ -55,17 +55,20 @@ function adaptRace(session: any, index: number): Race {
   };
 }
 
-const FLAG: Record<string, string> = {
-  'Australia': '🇦🇺', 'Austria': '🇦🇹', 'Azerbaijan': '🇦🇿',
-  'Bahrain': '🇧🇭', 'Belgium': '🇧🇪', 'Brazil': '🇧🇷',
-  'Canada': '🇨🇦', 'China': '🇨🇳', 'France': '🇫🇷',
-  'Hungary': '🇭🇺', 'Italy': '🇮🇹', 'Japan': '🇯🇵',
-  'Mexico': '🇲🇽', 'Monaco': '🇲🇨', 'Netherlands': '🇳🇱',
-  'Qatar': '🇶🇦', 'Saudi Arabia': '🇸🇦', 'Singapore': '🇸🇬',
-  'Spain': '🇪🇸', 'United Arab Emirates': '🇦🇪',
-  'United Kingdom': '🇬🇧', 'United States': '🇺🇸',
+const COUNTRY_ISO: Record<string, string> = {
+  'Australia': 'au', 'Austria': 'at', 'Azerbaijan': 'az',
+  'Bahrain': 'bh', 'Belgium': 'be', 'Brazil': 'br',
+  'Canada': 'ca', 'China': 'cn', 'France': 'fr',
+  'Hungary': 'hu', 'Italy': 'it', 'Japan': 'jp',
+  'Mexico': 'mx', 'Monaco': 'mc', 'Netherlands': 'nl',
+  'Qatar': 'qa', 'Saudi Arabia': 'sa', 'Singapore': 'sg',
+  'Spain': 'es', 'United Arab Emirates': 'ae',
+  'United Kingdom': 'gb', 'United States': 'us',
 };
-const countryFlag = (name: string) => FLAG[name] ?? '🏁';
+const countryFlagUrl = (name: string) => {
+  const iso = COUNTRY_ISO[name];
+  return iso ? `https://flagcdn.com/w320/${iso}.png` : null;
+};
 
 import Classification from './components/Classification';
 import LapChart from './components/LapChart';
@@ -184,13 +187,20 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${import.meta.env.VITE_API_URL}/api/races?season=2025`)
-      .then(r => r.json())
-      .then(data => {
-        const adapted = data.races.map(adaptRace);
-        if (adapted.length > 0) setRaces(adapted);
+    const base = import.meta.env.VITE_API_URL;
+    const seasons = [2025, 2024, 2023];
+    Promise.all(
+      seasons.map(s =>
+        fetch(`${base}/api/races?season=${s}`)
+          .then(r => r.json())
+          .then(data => (data.races ?? []).map((session: any, i: number) => adaptRace({ ...session, year: s }, i)))
+          .catch(() => [] as Race[])
+      )
+    )
+      .then(results => {
+        const all = results.flat();
+        if (all.length > 0) setRaces(all);
       })
-      .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
@@ -366,7 +376,9 @@ export default function App() {
             <div className="canvas-loader">
               <div className="canvas-loader-inner">
                 <div className="cl-flag">
-                  {countryFlag(race.country)}
+                  {countryFlagUrl(race.country)
+                    ? <img src={countryFlagUrl(race.country)!} alt={race.country} className="cl-flag-img" />
+                    : '🏁'}
                 </div>
                 <p className="cl-race">{race.name.toUpperCase()}</p>
                 <p className="cl-sub">LOADING RACE DATA</p>
@@ -395,7 +407,7 @@ export default function App() {
               selectedCode={selectedCode} onSelect={setSelectedCode}
               rankings={rankings} currentLap={lap}
               stintsByCode={stintsByCode}
-              fastestLapCode={fastestLapCode} />
+              fastestLapCode={fastestLapCode} activeSeason={activeYear} />
           </div>
           
           <LapChart

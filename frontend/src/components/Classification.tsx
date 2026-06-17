@@ -13,14 +13,16 @@ interface Props {
   currentLap: number;
   stintsByCode: Record<string, Stint[]>;
   fastestLapCode?: string | null;
+  activeSeason?: number;
 }
 
-export default function Classification({ results, drivers, selectedCode, onSelect, rankings, currentLap, stintsByCode, fastestLapCode }: Props) {
+export default function Classification({ results, drivers, selectedCode, onSelect, rankings, currentLap, stintsByCode, fastestLapCode, activeSeason }: Props) {
   const byCode = Object.fromEntries(drivers.map(d => [d.code, d]));
   const resultByCode = Object.fromEntries(results.map(r => [r.code, r]));
   const teamLogoURL = (team: string) =>
-    `https://media.formula1.com/image/upload/c_lfill,w_48/q_auto/v1740000001/common/f1/2026/${team.toLowerCase().replace(/\s/g, '')}/2026${team.toLowerCase().replace(/\s/g, '')}logowhite.webp`;
+    `https://media.formula1.com/image/upload/c_lfill,w_48/q_auto/v1740000001/common/f1/${activeSeason}/${team.toLowerCase().replace(/\s/g, '')}/${activeSeason}${team.toLowerCase().replace(/\s/g, '')}logowhite.webp`;
 
+  console.log(activeSeason, teamLogoURL('Mercedes'));
   const currentLapIndex = currentLap - 1;
   const currentRanking = rankings[currentLapIndex];
 
