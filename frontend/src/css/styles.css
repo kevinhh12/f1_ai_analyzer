@@ -2555,3 +2555,18 @@ body {
   color: var(--accent);
   font-size: 9px;
 }
+.page-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  gap: 12px;
+  color: var(--fg-muted);
+  font-family: var(--font-sans);
+}
+.page-placeholder h1 {
+  font: 700 32px var(--font-sans);
+  color: var(--fg);
+  letter-spacing: .04em;
+}
