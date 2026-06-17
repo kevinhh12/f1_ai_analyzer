@@ -1237,14 +1237,15 @@ body {
 }
 
 .canvas-head .eb {
-  font: 600 10px/1 var(--font-sans);
+  font: 600 12px/1 var(--font-sans);
   letter-spacing: .2em;
   text-transform: uppercase;
   color: var(--fg-subtle);
+  padding: 0 2px;
 }
 
 .canvas-head .nm {
-  font: 700 36px/1 var(--font-display);
+  font: 700 45px/1 var(--font-display);
   letter-spacing: -0.005em;
   text-transform: uppercase;
   color: var(--fg);
@@ -1260,18 +1261,19 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  align-items: flex-end;
+  align-items: flex-start;
 }
 
 .canvas-head .meta .lbl {
-  font: 600 9px var(--font-sans);
+  font: 600 10px var(--font-sans);
   letter-spacing: .18em;
   text-transform: uppercase;
   color: var(--fg-subtle);
+
 }
 
 .canvas-head .meta .v {
-  font: 600 18px var(--font-mono);
+  font: 600 30px var(--font-mono);
   color: var(--fg);
   font-variant-numeric: tabular-nums;
 }
@@ -2569,4 +2571,41 @@ body {
   font: 700 32px var(--font-sans);
   color: var(--fg);
   letter-spacing: .04em;
+}
+
+/* ── Weather Widget ─────────────────────────────────────────────────────────── */
+
+
+.weather-widget {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.dial-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0;
+  width: 52px;
+}
+
+.dial-label {
+  font: 600 7px var(--font-mono);
+  letter-spacing: .1em;
+  color: rgba(255,255,255,0.4);
+  text-transform: uppercase;
+  align-self: center;
+}
+
+.dial-lowhigh {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0 4px;
+  font: 500 8px var(--font-mono);
+  color: rgba(255,255,255,0.25);
+  margin-top: -6px;
+  padding-bottom: 2px;
 }

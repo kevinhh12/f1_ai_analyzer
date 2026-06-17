@@ -8,6 +8,7 @@ import TyreStrategy from '../components/TyreStrategy';
 import Sidebar from '../components/Sidebar';
 import TrackMap from '../components/TrackMap';
 import BottomRaceDrawer from '../components/BottomDrawer';
+import WeatherWidget from '../components/WeatherWidget';
 import {Link} from 'react-router-dom';
 
 const LAPS_BY_CIRCUIT: Record<string, number> = {
@@ -141,10 +142,19 @@ function CanvasHead({ race, activeYear, lap, rankings, chartData, drivers }: Can
 
   return (
     <header className="canvas-head">
-      <div id="summary" className="title">
-        <span className="eb">{activeYear} · ROUND {String(race.round).padStart(2, '0')} · {race.country}</span>
-        <span className="nm">{race.name.toUpperCase()} — RACE</span>
+      <div className="flex flex-row">
+        <div id="summary" className="title">
+          <span className="nm font">{race.name.toUpperCase()} — RACE</span>
+          <span className="eb">{activeYear} · ROUND {String(race.round).padStart(2, '0')} · {race.country}</span>
+        </div>
+        <div className= "px-10">
+          <WeatherWidget />
+        </div>
+        
       </div>
+      
+
+       
       <div className="meta">
         <div className="item">
           <span className="lbl">DISTANCE</span>
@@ -161,6 +171,7 @@ function CanvasHead({ race, activeYear, lap, rankings, chartData, drivers }: Can
           </span>
         </div>
       </div>
+     
     </header>
   );
 }
