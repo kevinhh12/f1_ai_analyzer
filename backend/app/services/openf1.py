@@ -141,6 +141,13 @@ def get_drivers(session_key: int) -> list:
     """Driver info for a session — static, never changes."""
     return _get("drivers", {"session_key": session_key})
 
+@lru_cache(maxsize=32)
+def get_location(session_key: int) -> dict:
+    # Unfinished
+    """Location info for a session — static, never changes."""
+    locations = _get("location", {"session_key": session_key})
+    return locations[0] if locations else {}
+
 
 # ── Live data — TTL cache (stale data = wrong live standings) ─────────────────
 
@@ -182,3 +189,4 @@ def get_position(session_key: int, driver_number: int = None) -> list:
     if driver_number is not None:
         params["driver_number"] = driver_number
     return _ttl_get(key, lambda: _get("position", params), ttl=_ttl_for(session_key, TTL_LIVE_POSITION))
+
