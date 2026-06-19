@@ -405,7 +405,7 @@ export default function RacePage() {
             currentLap={lap} results={results} drivers={drivers}
           />
           <div id="map-classi" className='panel flex 2xl:!flex-row'>
-            <TrackMap track={race.track} year={activeYear} />
+            <TrackMap sessionKey={race.session_key!} lap={lap} drivers={drivers} />
             <Classification
               results={results} drivers={drivers}
               selectedCode={selectedCode} onSelect={setSelectedCode}
