@@ -32,9 +32,16 @@ export function processStintData(
       endLap: s.lap_end ?? totalLaps,
     });
   }
-  // Sort each driver's stints chronologically
   for (const code of Object.keys(byCode)) {
-    byCode[code].sort((a, b) => a.startLap - b.startLap);
+    // Sort by startLap, then endLap so the longest stint for a given startLap comes last
+    byCode[code].sort((a, b) =>
+      a.startLap !== b.startLap ? a.startLap - b.startLap : a.endLap - b.endLap
+    );
+    // Deduplicate: when multiple stints share the same startLap (red-flag restart),
+    // keep only the last one (highest endLap = the actual race stint)
+    byCode[code] = byCode[code].filter((s, i, arr) =>
+      i === arr.length - 1 || s.startLap !== arr[i + 1].startLap
+    );
   }
   return byCode;
 }
