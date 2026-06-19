@@ -6,17 +6,18 @@ interface Bounds { x_min: number; x_max: number; y_min: number; y_max: number; }
 interface Props {
   sessionKey: number;
   lap: number;
+  currentTimeMs: number;
+  raceStartEpoch: number;
   drivers: { num: string; code: string; color: string }[];
 }
 
-export default function TrackMap({ sessionKey, lap, drivers }: Props) {
+export default function TrackMap({ sessionKey, lap, currentTimeMs, raceStartEpoch, drivers }: Props) {
   const base = import.meta.env.VITE_API_URL;
 
   const [bounds, setBounds] = useState<Bounds | null>(null);
   const [outlineSamples, setOutlineSamples] = useState<Sample[]>([]);
   const [lapSamples, setLapSamples] = useState<Record<string, Sample[]>>({});
 
-  // Fetch bounds + lap 1 outline once per session
   useEffect(() => {
     if (!sessionKey) return;
     setBounds(null);
@@ -33,15 +34,12 @@ export default function TrackMap({ sessionKey, lap, drivers }: Props) {
         const driverSamples = Object.values(lap1Data.drivers ?? {}) as Sample[][];
         if (!driverSamples.length) return;
 
-        // Pick the driver with the most samples for the cleanest outline
         const best = driverSamples.reduce((a, b) => a.length >= b.length ? a : b);
-        const sorted = [...best].sort((a, b) => a.date.localeCompare(b.date));
-        setOutlineSamples(sorted);
+        setOutlineSamples([...best].sort((a, b) => a.date.localeCompare(b.date)));
       })
       .catch(() => {});
   }, [sessionKey]);
 
-  // Fetch location samples for the current lap
   useEffect(() => {
     if (!sessionKey || !lap) return;
     fetch(`${base}/api/location?session_key=${sessionKey}&lap=${lap}`)
@@ -54,14 +52,13 @@ export default function TrackMap({ sessionKey, lap, drivers }: Props) {
     if (!bounds) return '0 0 1000 1000';
     const w = bounds.x_max - bounds.x_min;
     const h = bounds.y_max - bounds.y_min;
-    const pad = Math.min(w, h) * 0.04; // padding so dots near edges don't get clipped
+    const pad = Math.min(w, h) * 0.04;
     return `${bounds.x_min - pad} ${-bounds.y_max - pad} ${w + pad * 2} ${h + pad * 2}`;
   }, [bounds]);
 
   const outlinePoints = useMemo(() => {
     if (!outlineSamples.length) return '';
     const pts = outlineSamples.map(s => `${s.x},${-s.y}`);
-    // Close the loop by repeating the first point
     pts.push(pts[0]);
     return pts.join(' ');
   }, [outlineSamples]);
@@ -70,16 +67,25 @@ export default function TrackMap({ sessionKey, lap, drivers }: Props) {
     if (!bounds) return [];
     const byNum = Object.fromEntries(drivers.map(d => [d.num, d]));
     const result: { code: string; color: string; x: number; y: number }[] = [];
+    const targetEpoch = raceStartEpoch + currentTimeMs;
 
     for (const [num, samples] of Object.entries(lapSamples)) {
+
       const driver = byNum[num];
       if (!driver || !samples.length) continue;
-      const sorted = [...samples].sort((a, b) => a.date.localeCompare(b.date));
-      const last = sorted[sorted.length - 1];
-      result.push({ code: driver.code, color: driver.color, x: last.x, y: -last.y });
+
+      let closest = samples[0];
+      let minDiff = Infinity;
+      for (const s of samples) {
+        if (!s.date) continue;
+        const diff = Math.abs(new Date(s.date).getTime() - targetEpoch);
+        if (diff < minDiff) { minDiff = diff; closest = s; }
+      }
+
+      result.push({ code: driver.code, color: driver.color, x: closest.x, y: -closest.y });
     }
     return result;
-  }, [lapSamples, bounds, drivers]);
+  }, [lapSamples, bounds, drivers, currentTimeMs, raceStartEpoch]);
 
   const dotR = useMemo(() => {
     if (!bounds) return 50;
@@ -98,7 +104,6 @@ export default function TrackMap({ sessionKey, lap, drivers }: Props) {
             className="tm-svg p-8"
             preserveAspectRatio="xMidYMid meet"
           >
-            {/* Track outline — thick glow layer + sharp centre line */}
             <polyline
               points={outlinePoints}
               fill="none"
@@ -116,12 +121,17 @@ export default function TrackMap({ sessionKey, lap, drivers }: Props) {
               strokeLinejoin="round"
             />
 
-            {/* Driver dots */}
             {dots.map(d => (
-              <g key={d.code}>
-                <circle cx={d.x} cy={d.y} r={dotR} fill={d.color} opacity={0.95} />
+              <g
+                key={d.code}
+                style={{
+                  transform: `translate(${d.x}px, ${d.y}px)`,
+                  transition: 'transform 0.25s linear',
+                }}
+              >
+                <circle r={dotR} fill={d.color} opacity={0.95} />
                 <text
-                  x={d.x} y={d.y + dotR * 0.08}
+                  y={dotR * 0.08}
                   textAnchor="middle"
                   dominantBaseline="middle"
                   fill="#fff"

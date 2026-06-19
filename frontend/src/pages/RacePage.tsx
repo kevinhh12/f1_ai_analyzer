@@ -52,22 +52,43 @@ const countryFlagUrl = (name: string) => {
   return iso ? `https://flagcdn.com/w320/${iso}.png` : null;
 };
 
-interface ScrubberProps {
-  totalLaps: number;
-  lap: number;
-  onChange: React.Dispatch<React.SetStateAction<number>>;
+function fmtRaceTime(ms: number) {
+  const totalS = Math.floor(ms / 1000);
+  const m = Math.floor(totalS / 60);
+  const s = String(totalS % 60).padStart(2, '0');
+  return `${m}:${s}`;
 }
 
-function Scrubber({ totalLaps, lap, onChange }: ScrubberProps) {
+interface ScrubberProps {
+  raceDurationMs: number;
+  currentTimeMs: number;
+  currentLap: number;
+  totalLaps: number;
+  onChange: (ms: number) => void;
+}
 
+// Real-time playback: 1ms of real time = 1ms of race time
+const TICK_MS = 100; // fire every 100ms
+const STEP_MS = TICK_MS; // advance race time by same amount
+
+function Scrubber({ raceDurationMs, currentTimeMs, currentLap, totalLaps, onChange }: ScrubberProps) {
   const [playing, setPlaying] = useState(false);
+  const timeRef = useRef(currentTimeMs);
+  timeRef.current = currentTimeMs;
+
   useEffect(() => {
     if (!playing) return;
     const id = setInterval(() => {
-      onChange(l => l >= totalLaps ? 1 : l + 1);
-    }, 250);
+      const next = timeRef.current + STEP_MS;
+      if (next >= raceDurationMs) {
+        onChange(raceDurationMs);
+        setPlaying(false);
+      } else {
+        onChange(next);
+      }
+    }, TICK_MS);
     return () => clearInterval(id);
-  }, [playing, totalLaps, onChange]);
+  }, [playing, raceDurationMs]);
 
   return (
     <div className="scrubber">
@@ -75,9 +96,16 @@ function Scrubber({ totalLaps, lap, onChange }: ScrubberProps) {
         {playing ? '❚❚' : '▶'}
       </button>
       <span className="lap-lbl">LAP</span>
-      <input type="range" min="1" max={totalLaps} value={lap}
-             onChange={e => onChange(Number(e.target.value))} />
-      <span className="lap-v">{lap}/{totalLaps}</span>
+      <input
+        type="range"
+        min={0}
+        max={raceDurationMs || 1}
+        step={1000}
+        value={currentTimeMs}
+        onChange={e => onChange(Number(e.target.value))}
+      />
+      <span className="lap-v">{currentLap}/{totalLaps}</span>
+      <span className="lap-time">{fmtRaceTime(currentTimeMs)}</span>
     </div>
   );
 }
@@ -201,7 +229,12 @@ export default function RacePage() {
   }, [races]);
 
   const race = races.find(r => r.round === activeRound && r.year === activeYear) ?? races[0];
-  const [lap, setLap] = useState(1);
+
+  const [currentTimeMs, setCurrentTimeMs] = useState(0);
+  const [lapStartOffsets, setLapStartOffsets] = useState<number[]>([]); // ms from race start, index = lap-1
+  const [rawPositions, setRawPositions] = useState<any[]>([]);
+  const [rawIntervals, setRawIntervals] = useState<any[]>([]);
+  const [numToCode, setNumToCode] = useState<Record<string, string>>({});
 
   const [chartData, setChartData] = useState<LapEntry[]>([]);
   const [rankings, setRankings]   = useState<LapRanking[]>([]);
@@ -210,6 +243,24 @@ export default function RacePage() {
   const [dataLoading, setDataLoading] = useState(false);
   const [weatherReadings, setWeatherReadings] = useState<any[]>([]);
   const [lapTimestamps, setLapTimestamps] = useState<string[]>([]); // index = lap-1, value = date_start
+
+  // Derive current lap from the time scrubber position
+  const lap = useMemo(() => {
+    if (!lapStartOffsets.length) return 1;
+    let l = 1;
+    for (let i = 0; i < lapStartOffsets.length; i++) {
+      if (currentTimeMs >= lapStartOffsets[i]) {
+        l = i + 1;
+      } else {
+        break;
+      }
+    }
+    return l;
+  }, [currentTimeMs, lapStartOffsets]);
+
+  const raceDurationMs = lapStartOffsets.length > 0
+    ? lapStartOffsets[lapStartOffsets.length - 1]
+    : 0;
 
   // When a race is picked, fetch real lap count + drivers
   useEffect(() => {
@@ -227,8 +278,9 @@ export default function RacePage() {
       fetch(`${base}/api/pitstops?session_key=${key}`).then(r => r.json()),
       fetch(`${base}/api/position?session_key=${key}`).then(r => r.json()),
       fetch(`${base}/api/weather?session_key=${key}`).then(r => r.json()),
+      fetch(`${base}/api/intervals?session_key=${key}`).then(r => r.json()),
     ])
-      .then(([totalLapsData, lapData, tyreData, driverData, pitData, posData, weatherData]) => {
+      .then(([totalLapsData, lapData, tyreData, driverData, pitData, posData, weatherData, intervalData]) => {
         if (totalLapsData.total_laps) {
           setRaces(prev => prev.map(r =>
             r.session_key === key ? { ...r, laps: totalLapsData.total_laps } : r
@@ -237,10 +289,13 @@ export default function RacePage() {
         if (weatherData.readings?.length) setWeatherReadings(weatherData.readings);
         if (driverData.drivers?.length) setDrivers(driverData.drivers.map(adaptDriver));
         if (pitData.pit_stops?.length) setPitStops(pitData.pit_stops);
-        const numToCode: Record<number, string> = {};
+        const numToCode: Record<string, string> = {};
         (driverData.drivers ?? []).forEach((d: any) => {
-          numToCode[d.driver_number] = d.name_acronym;
+          numToCode[String(d.driver_number)] = d.name_acronym;
         });
+        setNumToCode(numToCode);
+        setRawPositions(posData.positions ?? []);
+        setRawIntervals(intervalData.intervals ?? []);
 
         if (lapData.laps?.length) {
           // Build lap→timestamp map: for each lap number, take the earliest date_start across all drivers
@@ -254,6 +309,17 @@ export default function RacePage() {
           const maxLap = Math.max(...Object.keys(lapDateMap).map(Number));
           const timestamps = Array.from({ length: maxLap }, (_, i) => lapDateMap[i + 1] ?? '');
           setLapTimestamps(timestamps);
+
+          // Build ms-from-race-start offsets for the time scrubber
+          const raceStartEpoch = timestamps[0] ? new Date(timestamps[0]).getTime() : 0;
+          const offsets = timestamps.map(ts => ts ? new Date(ts).getTime() - raceStartEpoch : 0);
+          setLapStartOffsets(offsets);
+
+          // For finished races, start the scrubber at the last lap
+          const today = new Date().toISOString().slice(0, 10);
+          if (race.date < today && offsets.length > 0) {
+            setCurrentTimeMs(offsets[offsets.length - 1]);
+          }
 
           const rawPositions = posData.positions ?? [];
           const { chartData, rankings } = processRealLapData(lapData.laps, numToCode, rawPositions);
@@ -294,10 +360,6 @@ export default function RacePage() {
 
   const [selectedCode, setSelectedCode] = useState('');
 
-  useEffect(() => {
-    if (race && lap > race.laps) setLap(Math.min(lap, race.laps));
-  }, [race?.laps]);
-
   // Driver who holds the fastest lap up to the current scrubber position
   const fastestLapCode = useMemo(() => {
     let bestMs = Infinity, bestCode = '';
@@ -313,6 +375,51 @@ export default function RacePage() {
     }
     return bestCode || null;
   }, [chartData, lap]);
+
+  const raceStartEpoch = lapTimestamps[0] ? new Date(lapTimestamps[0]).getTime() : 0;
+
+  // Set of driver numbers that are still active at the current race time.
+  // A driver is active if their latest position entry is within 3 minutes of now.
+  // DNS drivers have no entries → never added. DNF drivers' entries stop at retirement.
+
+  const liveRanking = useMemo(() => {
+    if (!rawPositions.length || !raceStartEpoch) return rankings[lap - 1] ?? null;
+
+    const targetEpoch = raceStartEpoch + currentTimeMs;
+
+    // Latest position entry per driver up to current time
+    const latestPos: Record<string, { pos: number; epoch: number }> = {};
+    for (const p of rawPositions) {
+      if (!p.date) continue;
+      const epoch = new Date(p.date).getTime();
+      if (epoch > targetEpoch) continue;
+      const num = String(p.driver_number);
+      if (!latestPos[num] || epoch > latestPos[num].epoch) {
+        latestPos[num] = { pos: p.position, epoch };
+      }
+    }
+
+    if (!Object.keys(latestPos).length) return rankings[lap - 1] ?? null;
+
+    // Latest gap_to_leader per driver from interval data up to current time
+    const latestGap: Record<string, number> = {};
+    for (const iv of rawIntervals) {
+      if (!iv.date || iv.gap_to_leader == null) continue;
+      const epoch = new Date(iv.date).getTime();
+      if (epoch > targetEpoch) continue;
+      const num = String(iv.driver_number);
+      latestGap[num] = iv.gap_to_leader * 1000; // seconds → ms
+    }
+
+    const order = Object.entries(latestPos)
+      .sort((a, b) => a[1].pos - b[1].pos)
+      .map(([num, { pos }]) => {
+        const code = numToCode[num] ?? num;
+        return { code, pos, gapMs: latestGap[num] ?? 0 };
+      });
+
+    return { lap, order };
+  }, [rawPositions, rawIntervals, currentTimeMs, raceStartEpoch, rankings, lap, numToCode]);
 
   // Weather reading closest to the current lap's timestamp
   const weather = useMemo(() => {
@@ -330,7 +437,7 @@ export default function RacePage() {
     return closest;
   }, [weatherReadings, lapTimestamps, lap]);
 
-  // Clear state when switching races; set scrubber to last lap for historical races
+  // Clear state when switching races
   useEffect(() => {
     setChartData([]);
     setRankings([]);
@@ -339,10 +446,11 @@ export default function RacePage() {
     setPitStops([]);
     setWeatherReadings([]);
     setLapTimestamps([]);
-    if (race) {
-      const today = new Date().toISOString().slice(0, 10);
-      setLap(race.date < today ? race.laps : 1);
-    }
+    setLapStartOffsets([]);
+    setCurrentTimeMs(0);
+    setRawPositions([]);
+    setRawIntervals([]);
+    setNumToCode({});
   }, [race?.session_key]);
 
   if (loading || !race) {
@@ -397,7 +505,13 @@ export default function RacePage() {
           />
 
      
-          <Scrubber totalLaps={race.laps} lap={lap} onChange={setLap} />
+          <Scrubber
+            raceDurationMs={raceDurationMs}
+            currentTimeMs={currentTimeMs}
+            currentLap={lap}
+            totalLaps={race.laps}
+            onChange={setCurrentTimeMs}
+          />
           
           <StatGrid
             chartData={chartData} stintsByCode={stintsByCode}
@@ -405,12 +519,19 @@ export default function RacePage() {
             currentLap={lap} results={results} drivers={drivers}
           />
           <div id="map-classi" className='panel flex 2xl:!flex-row'>
-            <TrackMap sessionKey={race.session_key!} lap={lap} drivers={drivers} />
+            <TrackMap
+              sessionKey={race.session_key!}
+              lap={lap}
+              currentTimeMs={currentTimeMs}
+              raceStartEpoch={raceStartEpoch}
+              drivers={drivers}
+            />
             <Classification
               results={results} drivers={drivers}
               selectedCode={selectedCode} onSelect={setSelectedCode}
-              rankings={rankings} currentLap={lap}
+              currentRanking={liveRanking} currentLap={lap}
               stintsByCode={stintsByCode}
+              pitStops={pitStops}
               fastestLapCode={fastestLapCode} activeSeason={activeYear} />
           </div>
           

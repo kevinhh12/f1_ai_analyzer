@@ -305,3 +305,13 @@ def get_position(session_key: int, driver_number: int = None) -> list:
         params["driver_number"] = driver_number
     return _ttl_get(key, lambda: _get("position", params), ttl=_ttl_for(session_key, TTL_LIVE_POSITION))
 
+
+def get_intervals(session_key: int) -> list:
+    """All interval readings for a session.
+
+    Each entry contains gap_to_leader and interval (gap to car ahead) in seconds,
+    with a timestamp so the frontend can find the closest reading at any race time.
+    """
+    key = f"intervals_{session_key}"
+    return _ttl_get(key, lambda: _get("intervals", {"session_key": session_key}), ttl=_ttl_for(session_key, TTL_LIVE_POSITION))
+

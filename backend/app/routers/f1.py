@@ -23,6 +23,7 @@ from app.services.openf1 import (
     get_weather,
     get_location_for_lap,
     get_location_bounds,
+    get_intervals,
 )
 from app.services.ai import ask
 
@@ -280,6 +281,21 @@ def location(session_key: int, lap: int):
     try:
         data = get_location_for_lap(session_key, lap)
         return {"session_key": session_key, "lap": lap, **data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/intervals")
+def intervals(session_key: int):
+    """
+    All interval readings for a session, ordered by time.
+    Each entry has date, driver_number, gap_to_leader (s), interval (s).
+
+    Example: GET /intervals?session_key=9158
+    """
+    try:
+        data = get_intervals(session_key)
+        return {"session_key": session_key, "count": len(data), "intervals": data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -1869,6 +1869,14 @@ body {
   text-align: right;
 }
 
+.scrubber .lap-time {
+  font: 500 12px var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: rgba(255,255,255,0.4);
+  min-width: 44px;
+  text-align: left;
+}
+
 
 /* ---------- RACE DROPDOWN ---------- */
 

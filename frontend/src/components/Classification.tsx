@@ -9,22 +9,21 @@ interface Props {
   drivers: Driver[];
   selectedCode: string;
   onSelect: (code: string) => void;
-  rankings: LapRanking[];
+  currentRanking?: LapRanking | null;
   currentLap: number;
   stintsByCode: Record<string, Stint[]>;
+  pitStops: any[];
   fastestLapCode?: string | null;
   activeSeason?: number;
 }
 
-export default function Classification({ results, drivers, selectedCode, onSelect, rankings, currentLap, stintsByCode, fastestLapCode, activeSeason }: Props) {
+export default function Classification({ results, drivers, selectedCode, onSelect, currentRanking, currentLap, stintsByCode, pitStops, fastestLapCode, activeSeason }: Props) {
   const byCode = Object.fromEntries(drivers.map(d => [d.code, d]));
   const resultByCode = Object.fromEntries(results.map(r => [r.code, r]));
+  // Map driver number → code for pit stop lookups
+  const numToCode = Object.fromEntries(drivers.map(d => [d.num, d.code]));
   const teamLogoURL = (team: string) =>
     `https://media.formula1.com/image/upload/c_lfill,w_48/q_auto/v1740000001/common/f1/${activeSeason}/${team.toLowerCase().replace(/\s/g, '')}/${activeSeason}${team.toLowerCase().replace(/\s/g, '')}logowhite.webp`;
-
-  console.log(activeSeason, teamLogoURL('Mercedes'));
-  const currentLapIndex = currentLap - 1;
-  const currentRanking = rankings[currentLapIndex];
 
   const rankedOrder: { code: string; pos: number; gapMs: number }[] = currentRanking
     ? currentRanking.order
@@ -60,16 +59,18 @@ export default function Classification({ results, drivers, selectedCode, onSelec
           const lead = pos === 1;
           const hasFastestLap = code === fastestLapCode;
 
-          // Stints used up to currentLap — from real data if available, fall back to r.tyres
           const realStints = stintsByCode[code];
-          const usedCompounds: string[] = realStints
-            ? realStints.filter(s => s.startLap <= currentLap).map(s => s.compound)
-            : r.tyres.slice(0, r.stops + 1);
 
-          // Pit count = stints started so far minus 1
-          const livePits = realStints
-            ? Math.max(0, realStints.filter(s => s.startLap <= currentLap).length - 1)
-            : r.stops;
+          // Count pit stops from actual pit stop data (accurate lap numbers, handles red-flag restarts)
+          const livePits = pitStops.filter(p =>
+            numToCode[String(p.driver_number)] === code && p.lap_number <= currentLap
+          ).length;
+
+          // Show stints based on completed pit stops — avoids showing future stints when
+          // multiple stints share the same startLap (red flag / restart data from OpenF1)
+          const usedCompounds: string[] = realStints
+            ? realStints.slice(0, livePits + 1).map(s => s.compound)
+            : r.tyres.slice(0, r.stops + 1);
 
           return (
             <button
