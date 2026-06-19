@@ -11,32 +11,6 @@ import BottomRaceDrawer from '../components/BottomDrawer';
 import WeatherWidget from '../components/WeatherWidget';
 import {Link} from 'react-router-dom';
 
-const LAPS_BY_CIRCUIT: Record<string, number> = {
-  Melbourne: 58,
-  Shanghai: 56,
-  Suzuka: 53,
-  Bahrain: 57,
-  Jeddah: 50,
-  Miami: 57,
-  Imola: 63,
-  Monaco: 78,
-  Barcelona: 66,
-  Montreal: 70,
-  Spielberg: 71,
-  Silverstone: 52,
-  Budapest: 70,
-  Spa: 44,
-  Zandvoort: 72,
-  Monza: 53,
-  Baku: 51,
-  Singapore: 62,
-  Austin: 56,
-  'Mexico City': 71,
-  'São Paulo': 71,
-  'Las Vegas': 50,
-  Lusail: 57,
-  'Yas Marina': 58,
-};
 
 function adaptDriver(d: any): Driver {
   return {
@@ -58,7 +32,7 @@ function adaptRace(session: any, index: number): Race {
     country: session.country_name,
     date: session.date_start.slice(0, 10),
     track: session.circuit_short_name,
-    laps: LAPS_BY_CIRCUIT[session.circuit_short_name] ?? 58, // real laps loaded after pick
+    laps: 1,
     session_key: session.session_key,
   };
 }
@@ -243,44 +217,25 @@ export default function RacePage() {
     const key = race.session_key;
     const base = import.meta.env.VITE_API_URL;
 
-    // Fetch total laps
-    fetch(`${base}/api/total-laps?session_key=${key}`)
-      .then(r => r.json())
-      .then(data => {
-        if (data.total_laps) {
-          setRaces(prev => prev.map(r =>
-            r.session_key === key ? { ...r, laps: data.total_laps } : r
-          ));
-        }
-      })
-      .catch(() => {});
-
-    // Fetch weather
-    fetch(`${base}/api/weather?session_key=${key}`)
-      .then(r => r.json())
-      .then(data => setWeatherReadings(data.readings ?? []))
-      .catch(() => {});
-
-    // Fetch real drivers
-    fetch(`${base}/api/drivers?session_key=${key}`)
-      .then(r => r.json())
-      .then(data => {
-        if (data.drivers?.length) {
-          setDrivers(data.drivers.map(adaptDriver));
-        }
-      })
-      .catch(() => {});
-
-    // Fetch laps + tyres + pitstops + positions in parallel, then combine
+    // Fetch all race data in one shot so the canvas only renders when everything is ready
     setDataLoading(true);
     Promise.all([
+      fetch(`${base}/api/total-laps?session_key=${key}`).then(r => r.json()),
       fetch(`${base}/api/laps?session_key=${key}`).then(r => r.json()),
       fetch(`${base}/api/tyres?session_key=${key}`).then(r => r.json()),
       fetch(`${base}/api/drivers?session_key=${key}`).then(r => r.json()),
       fetch(`${base}/api/pitstops?session_key=${key}`).then(r => r.json()),
       fetch(`${base}/api/position?session_key=${key}`).then(r => r.json()),
+      fetch(`${base}/api/weather?session_key=${key}`).then(r => r.json()),
     ])
-      .then(([lapData, tyreData, driverData, pitData, posData]) => {
+      .then(([totalLapsData, lapData, tyreData, driverData, pitData, posData, weatherData]) => {
+        if (totalLapsData.total_laps) {
+          setRaces(prev => prev.map(r =>
+            r.session_key === key ? { ...r, laps: totalLapsData.total_laps } : r
+          ));
+        }
+        if (weatherData.readings?.length) setWeatherReadings(weatherData.readings);
+        if (driverData.drivers?.length) setDrivers(driverData.drivers.map(adaptDriver));
         if (pitData.pit_stops?.length) setPitStops(pitData.pit_stops);
         const numToCode: Record<number, string> = {};
         (driverData.drivers ?? []).forEach((d: any) => {
