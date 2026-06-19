@@ -105,7 +105,7 @@ export default function Classification({ results, drivers, selectedCode, onSelec
                 ))}
               </span>
               <span className="cl-h stops">{livePits}</span>
-              <span className="cl-h gap">{formatGap(gapMs)}</span>
+              <span className="cl-h gap">{formatGap(gapMs,pos)}</span>
             </button>
           );
         })}

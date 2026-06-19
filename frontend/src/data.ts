@@ -114,8 +114,9 @@ export interface LapRanking {
   order: { code: string; pos: number; gapMs: number }[];
 }
 
-export function formatGap(ms: number): string {
-  if (ms === 0) return 'LEADER';
+export function formatGap(ms: number, pos: number): string {
+  if (ms === 0 && pos === 1) return 'LEADER';
+  if (ms === 0) return '+0.000';
   if (ms < 0) return 'DNF';
   const s = (ms / 1000).toFixed(3);
   return `+${s}`;
