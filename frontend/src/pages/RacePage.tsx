@@ -117,9 +117,10 @@ function fmtMs(ms: number) {
 interface CanvasHeadProps {
   race: Race; activeYear: number; lap: number;
   rankings: LapRanking[]; chartData: LapEntry[]; drivers: Driver[];
+  weather: Record<string, number | null>;
 }
 
-function CanvasHead({ race, activeYear, lap, rankings, chartData, drivers }: CanvasHeadProps) {
+function CanvasHead({ race, activeYear, lap, rankings, chartData, drivers, weather }: CanvasHeadProps) {
   const byCode = Object.fromEntries(drivers.map(d => [d.code, d]));
 
   const leaderCode = rankings[lap - 1]?.order[0]?.code ?? null;
@@ -148,7 +149,7 @@ function CanvasHead({ race, activeYear, lap, rankings, chartData, drivers }: Can
           <span className="eb">{activeYear} · ROUND {String(race.round).padStart(2, '0')} · {race.country}</span>
         </div>
         <div className= "px-10">
-          <WeatherWidget />
+          <WeatherWidget weather={weather} />
         </div>
         
       </div>
@@ -233,6 +234,8 @@ export default function RacePage() {
   const [stintsByCode, setStintsByCode] = useState<Record<string, Stint[]>>({});
   const [pitStops, setPitStops] = useState<any[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
+  const [weatherReadings, setWeatherReadings] = useState<any[]>([]);
+  const [lapTimestamps, setLapTimestamps] = useState<string[]>([]); // index = lap-1, value = date_start
 
   // When a race is picked, fetch real lap count + drivers
   useEffect(() => {
@@ -250,6 +253,12 @@ export default function RacePage() {
           ));
         }
       })
+      .catch(() => {});
+
+    // Fetch weather
+    fetch(`${base}/api/weather?session_key=${key}`)
+      .then(r => r.json())
+      .then(data => setWeatherReadings(data.readings ?? []))
       .catch(() => {});
 
     // Fetch real drivers
@@ -279,6 +288,18 @@ export default function RacePage() {
         });
 
         if (lapData.laps?.length) {
+          // Build lap→timestamp map: for each lap number, take the earliest date_start across all drivers
+          const lapDateMap: Record<number, string> = {};
+          for (const lap of lapData.laps) {
+            const n = lap.lap_number;
+            if (n && lap.date_start && (!lapDateMap[n] || lap.date_start < lapDateMap[n])) {
+              lapDateMap[n] = lap.date_start;
+            }
+          }
+          const maxLap = Math.max(...Object.keys(lapDateMap).map(Number));
+          const timestamps = Array.from({ length: maxLap }, (_, i) => lapDateMap[i + 1] ?? '');
+          setLapTimestamps(timestamps);
+
           const rawPositions = posData.positions ?? [];
           const { chartData, rankings } = processRealLapData(lapData.laps, numToCode, rawPositions);
 
@@ -338,6 +359,22 @@ export default function RacePage() {
     return bestCode || null;
   }, [chartData, lap]);
 
+  // Weather reading closest to the current lap's timestamp
+  const weather = useMemo(() => {
+    if (!weatherReadings.length) return {};
+    const lapDate = lapTimestamps[lap - 1];
+    if (!lapDate) return weatherReadings[weatherReadings.length - 1];
+    const lapMs = new Date(lapDate).getTime();
+    let closest = weatherReadings[0];
+    let minDiff = Infinity;
+    for (const r of weatherReadings) {
+      if (!r.date) continue;
+      const diff = Math.abs(new Date(r.date).getTime() - lapMs);
+      if (diff < minDiff) { minDiff = diff; closest = r; }
+    }
+    return closest;
+  }, [weatherReadings, lapTimestamps, lap]);
+
   // Clear state when switching races; set scrubber to last lap for historical races
   useEffect(() => {
     setChartData([]);
@@ -345,6 +382,8 @@ export default function RacePage() {
     setResults([]);
     setStintsByCode({});
     setPitStops([]);
+    setWeatherReadings([]);
+    setLapTimestamps([]);
     if (race) {
       const today = new Date().toISOString().slice(0, 10);
       setLap(race.date < today ? race.laps : 1);
@@ -399,6 +438,7 @@ export default function RacePage() {
             race={race} activeYear={activeYear}
             lap={lap} rankings={rankings}
             chartData={chartData} drivers={drivers}
+            weather={weather}
           />
 
      

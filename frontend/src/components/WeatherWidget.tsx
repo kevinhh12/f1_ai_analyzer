@@ -13,7 +13,6 @@ function DialGauge({ value, min, max, color, label, unit, display }: DialProps) 
   const cx = size / 2;
   const cy = size / 2;
   const totalTicks = 36;
-  // Start at bottom-left (225° from 12 o'clock), sweep 270° clockwise to bottom-right
   const startAngle = 225;
   const sweepAngle = 270;
   const pct = Math.min(1, Math.max(0, (value - min) / (max - min)));
@@ -38,19 +37,19 @@ function DialGauge({ value, min, max, color, label, unit, display }: DialProps) 
 
   return (
     <div className="dial-card">
-      <div className="dial-label ">{label}</div>
+      <div className="dial-label">{label}</div>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         {ticks.map((t, i) => (
           <line
             key={i}
             x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2}
             stroke={t.isIndicator ? '#fff' : t.isFilled ? color : 'rgba(255,255,255,0.12)'}
-            strokeWidth={t.isIndicator ? 2.5 : 1.5}
+            strokeWidth={t.isIndicator ? 2 : 1.2}
             strokeLinecap="round"
             style={t.isIndicator
-              ? { filter: 'drop-shadow(0 0 3px #fff)' }
+              ? { filter: 'drop-shadow(0 0 2px #fff)' }
               : t.isFilled
-                ? { filter: `drop-shadow(0 0 2px ${color}70)` }
+                ? { filter: `drop-shadow(0 0 1px ${color}70)` }
                 : undefined}
           />
         ))}
@@ -71,19 +70,40 @@ function DialGauge({ value, min, max, color, label, unit, display }: DialProps) 
   );
 }
 
-const FAKE_WEATHER = [
-  { label: 'AIR TEMP',  value: 26.4, min: 0,  max: 50,  color: '#f97316', unit: '°C',   display: '26.4' },
-  { label: 'TRACK',     value: 41.8, min: 0,  max: 70,  color: '#ef4444', unit: '°C',   display: '41.8' },
-  { label: 'HUMIDITY',  value: 68,   min: 0,  max: 100, color: '#38bdf8', unit: '%',    display: '68'   },
-  { label: 'WIND',      value: 12,   min: 0,  max: 50,  color: '#22d3ee', unit: 'km/h', display: '12'   },
-  { label: 'RAIN',      value: 15,   min: 0,  max: 100, color: '#a855f7', unit: '%',    display: '15'   },
-];
+interface WeatherData {
+  air_temperature?: number | null;
+  track_temperature?: number | null;
+  humidity?: number | null;
+  wind_speed?: number | null;
+  rainfall?: number | null;
+}
 
-export default function WeatherWidget() {
+interface Props {
+  weather?: WeatherData;
+}
+
+export default function WeatherWidget({ weather = {} }: Props) {
+  const stats = [
+    { label: 'AIR',   value: weather.air_temperature   ?? 26.4, min: 0,  max: 50,  color: '#f97316', unit: '°C',   fmt: (v: number) => v.toFixed(1) },
+    { label: 'TRACK', value: weather.track_temperature ?? 41.8, min: 0,  max: 70,  color: '#ef4444', unit: '°C',   fmt: (v: number) => v.toFixed(1) },
+    { label: 'HUM',   value: weather.humidity          ?? 68,   min: 0,  max: 100, color: '#38bdf8', unit: '%',    fmt: (v: number) => Math.round(v).toString() },
+    { label: 'WIND',  value: weather.wind_speed        ?? 12,   min: 0,  max: 50,  color: '#22d3ee', unit: 'km/h', fmt: (v: number) => Math.round(v).toString() },
+    { label: 'RAIN',  value: (weather.rainfall         ?? 0) > 0 ? 1 : 0, min: 0, max: 1, color: '#a855f7', unit: weather.rainfall ?? 0 > 0 ? 'YES' : 'NO', fmt: () => weather.rainfall ?? 0 > 0 ? 'YES' : 'NO' },
+  ];
+
   return (
     <div className="weather-widget">
-      {FAKE_WEATHER.map(stat => (
-        <DialGauge key={stat.label} {...stat} />
+      {stats.map(s => (
+        <DialGauge
+          key={s.label}
+          label={s.label}
+          value={s.value}
+          min={s.min}
+          max={s.max}
+          color={s.color}
+          unit={s.unit}
+          display={s.fmt(s.value)}
+        />
       ))}
     </div>
   );

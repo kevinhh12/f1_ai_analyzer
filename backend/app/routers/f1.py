@@ -20,6 +20,7 @@ from app.services.openf1 import (
     get_position,
     get_session_key,
     get_total_laps,
+    get_weather,
 )
 from app.services.ai import ask
 
@@ -236,5 +237,30 @@ def chat(req: ChatRequest):
         return ChatResponse(**result)
     except ValueError as e:
         raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/weather")
+def weather(session_key: int):
+    """
+    Return all weather readings for a session.
+    Each entry has a date field for correlating with lap timestamps.
+
+    Example: GET /weather?session_key=9158
+    """
+    try:
+        entries = get_weather(session_key)
+        readings = [
+            {
+                "date":              e.get("date"),
+                "air_temperature":   e.get("air_temperature"),
+                "track_temperature": e.get("track_temperature"),
+                "humidity":          e.get("humidity"),
+                "wind_speed":        e.get("wind_speed"),
+                "rainfall":          e.get("rainfall"),
+            }
+            for e in entries
+        ]
+        return {"session_key": session_key, "readings": readings}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

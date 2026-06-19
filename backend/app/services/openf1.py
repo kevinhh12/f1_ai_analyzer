@@ -149,7 +149,13 @@ def get_location(session_key: int) -> dict:
     return locations[0] if locations else {}
 
 
+
 # ── Live data — TTL cache (stale data = wrong live standings) ─────────────────
+
+def get_weather(session_key: int) -> list:
+    """All weather readings for a session, ordered by time."""
+    key = f"weather_{session_key}"
+    return _ttl_get(key, lambda: _get("weather", {"session_key": session_key}), ttl=_ttl_for(session_key, TTL_LIVE_LAPS))
 
 def get_lap_times(session_key: int, driver_number: int = None) -> list:
     key = f"laps_{session_key}_{driver_number}"
