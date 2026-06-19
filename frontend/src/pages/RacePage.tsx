@@ -245,6 +245,9 @@ export default function RacePage() {
   const [lapTimestamps, setLapTimestamps] = useState<string[]>([]); // index = lap-1, value = date_start
   const [raceDurationMs, setRaceDurationMs] = useState(0);
   const [lastLapByNum, setLastLapByNum] = useState<Record<string, number>>({});
+  const [rawLaps, setRawLaps] = useState<any[]>([]);
+  const [rawRaceControl, setRawRaceControl] = useState<any[]>([]);
+   
 
   // Derive current lap from the time scrubber position
   const lap = useMemo(() => {
@@ -278,8 +281,9 @@ export default function RacePage() {
       fetch(`${base}/api/position?session_key=${key}`).then(r => r.json()),
       fetch(`${base}/api/weather?session_key=${key}`).then(r => r.json()),
       fetch(`${base}/api/intervals?session_key=${key}`).then(r => r.json()),
+      fetch(`${base}/api/race-controls?session_key=${key}`).then(r => r.json()),
     ])
-      .then(([totalLapsData, lapData, tyreData, driverData, pitData, posData, weatherData, intervalData]) => {
+      .then(([totalLapsData, lapData, tyreData, driverData, pitData, posData, weatherData, intervalData, raceControlData]) => {
         if (totalLapsData.total_laps) {
           setRaces(prev => prev.map(r =>
             r.session_key === key ? { ...r, laps: totalLapsData.total_laps } : r
@@ -295,8 +299,11 @@ export default function RacePage() {
         setNumToCode(numToCode);
         setRawPositions(posData.positions ?? []);
         setRawIntervals(intervalData.intervals ?? []);
+        setRawRaceControl(raceControlData.controls ?? []);
 
         if (lapData.laps?.length) {
+          setRawLaps(lapData.laps);
+
           // Last lap completed per driver — distinguishes DNFs (few laps) from finishers
           const lastLap: Record<string, number> = {};
           for (const l of lapData.laps) {
@@ -441,6 +448,46 @@ export default function RacePage() {
     return { lap, order };
   }, [rawPositions, rawIntervals, currentTimeMs, raceStartEpoch, rankings, lap, numToCode]);
 
+  // Best lap per driver up to the current scrubber time — only counts laps completed before now
+  const liveBestByCode = useMemo(() => {
+    if (!rawLaps.length || !raceStartEpoch) return {} as Record<string, string>;
+    const targetEpoch = raceStartEpoch + currentTimeMs;
+    const bestMs: Record<string, number> = {};
+    for (const l of rawLaps) {
+      if (!l.date_start || !l.lap_duration || l.is_pit_out_lap || l.lap_number === 1) continue;
+      const completedAt = new Date(l.date_start).getTime() + l.lap_duration * 1000;
+      if (completedAt > targetEpoch) continue;
+      const code = numToCode[String(l.driver_number)];
+      if (!code) continue;
+      const ms = l.lap_duration * 1000;
+      if (!bestMs[code] || ms < bestMs[code]) bestMs[code] = ms;
+    }
+    const out: Record<string, string> = {};
+    for (const [code, ms] of Object.entries(bestMs)) {
+      const m = Math.floor(ms / 60000);
+      const s = ((ms % 60000) / 1000).toFixed(3).padStart(6, '0');
+      out[code] = `${m}:${s}`;
+    }
+    return out;
+  }, [rawLaps, currentTimeMs, raceStartEpoch, numToCode]);
+
+  // The most recent race control message up to the current scrubber time
+  const raceControlStatus = useMemo(() => {
+  if (!rawRaceControl.length || !raceStartEpoch) return null;
+  const targetEpoch = raceStartEpoch + currentTimeMs;
+
+  let latest: any = null;
+  for (const msg of rawRaceControl) {
+    if (!msg.date) continue;
+    const epoch = new Date(msg.date).getTime();
+    if (epoch > targetEpoch) continue;
+    if (!latest || epoch > new Date(latest.date).getTime()) {
+      latest = msg;
+    }
+  }
+  return latest;
+}, [rawRaceControl, currentTimeMs, raceStartEpoch]);
+
   // Weather reading closest to the current lap's timestamp
   const weather = useMemo(() => {
     if (!weatherReadings.length) return {};
@@ -473,7 +520,80 @@ export default function RacePage() {
     setNumToCode({});
     setRaceDurationMs(0);
     setLastLapByNum({});
+    setRawLaps([]);
+    setRawRaceControl([]);
   }, [race?.session_key]);
+
+  // Scan all race control messages up to current time to determine caution state.
+  // Only SC deployed, VSC deployed, and red flags trigger the glow.
+  // Green only appears when EXITING one of those periods.
+  const glowClass = useMemo(() => {
+    if (!rawRaceControl.length || !raceStartEpoch) return '';
+    const targetEpoch = raceStartEpoch + currentTimeMs;
+
+    let lastCautionEpoch = 0;
+    let cautionType = ''; // 'yellow' | 'red'
+    let lastResumeEpoch = 0;
+
+    for (const msg of rawRaceControl) {
+      if (!msg.date) continue;
+      const epoch = new Date(msg.date).getTime();
+      if (epoch > targetEpoch) continue;
+
+      const cat = msg.category ?? '';
+      const flag = msg.flag ?? '';
+      const text = (msg.message ?? '').toUpperCase();
+
+      // Caution starts: SC deployed, VSC deployed, or red flag
+      if (flag === 'RED') {
+        lastCautionEpoch = epoch;
+        cautionType = 'red';
+      } else if (cat === 'SafetyCar' && (text.includes('DEPLOYED') || text.includes('VIRTUAL SAFETY CAR'))) {
+        lastCautionEpoch = epoch;
+        cautionType = 'yellow';
+      }
+
+      // Caution ends: SC ending, green flag, or clear — only counts if a caution started
+      if (lastCautionEpoch > 0) {
+        if (cat === 'SafetyCar' && (text.includes('IN THIS LAP') || text.includes('ENDING'))) {
+          lastResumeEpoch = epoch;
+        } else if (flag === 'GREEN' || flag === 'CLEAR') {
+          lastResumeEpoch = epoch;
+        }
+      }
+    }
+
+    if (lastCautionEpoch > lastResumeEpoch) {
+      return cautionType === 'red' ? 'glow-red' : 'glow-yellow';
+    }
+    if (lastResumeEpoch > 0 && lastResumeEpoch > lastCautionEpoch) {
+      return 'glow-green';
+    }
+    return '';
+  }, [rawRaceControl, currentTimeMs, raceStartEpoch]);
+
+  // Yellow/red stay active indefinitely. Green flashes for 5s then fades out.
+  const [activeGlow, setActiveGlow] = useState('');
+  const glowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (glowTimerRef.current) clearTimeout(glowTimerRef.current);
+
+    if (glowClass === 'glow-yellow' || glowClass === 'glow-red') {
+      setActiveGlow(glowClass);
+    } else if (glowClass === 'glow-green') {
+      setActiveGlow('glow-green');
+      glowTimerRef.current = setTimeout(() => {
+        setActiveGlow('glow-exit');
+        glowTimerRef.current = setTimeout(() => setActiveGlow(''), 800);
+      }, 5000);
+    } else if (activeGlow && activeGlow !== 'glow-exit') {
+      setActiveGlow('glow-exit');
+      glowTimerRef.current = setTimeout(() => setActiveGlow(''), 800);
+    }
+
+    return () => { if (glowTimerRef.current) clearTimeout(glowTimerRef.current); };
+  }, [glowClass]);
 
   if (loading || !race) {
     return (
@@ -488,99 +608,102 @@ export default function RacePage() {
   }
 
   return (
-    <div className="app">
-      <TopBar
-        race={race}
-        currentLap={lap}
-        totalLaps={race.laps}
-        races={races}
-        onChangeRace={pickRace}
-      />
-      <div className="shell">
-        <Sidebar
+    <div className={`race-status ${activeGlow}`}>
+      <div className="app">
+        <TopBar
+          race={race}
+          currentLap={lap}
+          totalLaps={race.laps}
           races={races}
-          activeRound={activeRound}
-          activeYear={activeYear}
-          onPick={pickRace}
+          onChangeRace={pickRace}
         />
+        <div className="shell">
+          <Sidebar
+            races={races}
+            activeRound={activeRound}
+            activeYear={activeYear}
+            onPick={pickRace}
+          />
 
-        <main className="canvas">
-          {dataLoading && (
-            <div className="canvas-loader">
-              <div className="canvas-loader-inner">
-                <div className="cl-flag">
-                  {countryFlagUrl(race.country)
-                    ? <img src={countryFlagUrl(race.country)!} alt={race.country} className="cl-flag-img" />
-                    : '🏁'}
+          <main className="canvas">
+            {dataLoading && (
+              <div className="canvas-loader">
+                <div className="canvas-loader-inner">
+                  <div className="cl-flag">
+                    {countryFlagUrl(race.country)
+                      ? <img src={countryFlagUrl(race.country)!} alt={race.country} className="cl-flag-img" />
+                      : '🏁'}
+                  </div>
+                  <p className="cl-race">{race.name.toUpperCase()}</p>
+                  <p className="cl-sub">LOADING RACE DATA</p>
+                  <div className="loading-bar"><div className="loading-bar-fill" /></div>
                 </div>
-                <p className="cl-race">{race.name.toUpperCase()}</p>
-                <p className="cl-sub">LOADING RACE DATA</p>
-                <div className="loading-bar"><div className="loading-bar-fill" /></div>
               </div>
-            </div>
-          )}
-          <CanvasHead
-            race={race} activeYear={activeYear}
-            lap={lap} rankings={rankings}
-            chartData={chartData} drivers={drivers}
-            weather={weather}
-          />
-
-     
-          <Scrubber
-            raceDurationMs={raceDurationMs}
-            currentTimeMs={currentTimeMs}
-            currentLap={lap}
-            totalLaps={race.laps}
-            onChange={setCurrentTimeMs}
-          />
-          
-          <StatGrid
-            chartData={chartData} stintsByCode={stintsByCode}
-            pitStops={pitStops} rankings={rankings}
-            currentLap={lap} results={results} drivers={drivers}
-          />
-          <div id="map-classi" className='panel flex 2xl:!flex-row'>
-            <TrackMap
-              sessionKey={race.session_key!}
-              lap={lap}
-              totalLaps={race.laps}
-              currentTimeMs={currentTimeMs}
-              raceStartEpoch={raceStartEpoch}
-              drivers={drivers}
-              lastLapByNum={lastLapByNum}
+            )}
+            <CanvasHead
+              race={race} activeYear={activeYear}
+              lap={lap} rankings={rankings}
+              chartData={chartData} drivers={drivers}
+              weather={weather}
             />
-            <Classification
-              results={results} drivers={drivers}
-              selectedCode={selectedCode} onSelect={setSelectedCode}
-              currentRanking={liveRanking} currentLap={lap}
-              stintsByCode={stintsByCode}
-              pitStops={pitStops}
-              fastestLapCode={fastestLapCode} activeSeason={activeYear} />
-          </div>
-          
-          <LapChart
-            results={results} drivers={drivers}
-            chartData={chartData}
-            totalLaps={race.laps} currentLap={lap}
-            selectedCode={selectedCode} />
-          <TyreStrategy
-            results={results} drivers={drivers}
-            totalLaps={race.laps} currentLap={lap}
-            rankings={rankings}
-            stintsByCode={stintsByCode}
-            selectedCode={selectedCode} onSelect={setSelectedCode} />
 
-          <BottomRaceDrawer
+      
+            <Scrubber
+              raceDurationMs={raceDurationMs}
+              currentTimeMs={currentTimeMs}
+              currentLap={lap}
+              totalLaps={race.laps}
+              onChange={setCurrentTimeMs}
+            />
             
-            race={race}
-            currentLap={lap}
-            results={results}
-            drivers={drivers}
-            rankings={rankings}
-          />
-          
-        </main>
+            <StatGrid
+              chartData={chartData} stintsByCode={stintsByCode}
+              pitStops={pitStops} rankings={rankings}
+              currentLap={lap} results={results} drivers={drivers}
+            />
+            <div id="map-classi" className='panel flex 2xl:!flex-row'>
+              <TrackMap
+                sessionKey={race.session_key!}
+                lap={lap}
+                totalLaps={race.laps}
+                currentTimeMs={currentTimeMs}
+                raceStartEpoch={raceStartEpoch}
+                drivers={drivers}
+                lastLapByNum={lastLapByNum}
+              />
+              <Classification
+                results={results} drivers={drivers}
+                selectedCode={selectedCode} onSelect={setSelectedCode}
+                currentRanking={liveRanking} currentLap={lap}
+                stintsByCode={stintsByCode}
+                pitStops={pitStops}
+                fastestLapCode={fastestLapCode} activeSeason={activeYear}
+                liveBestByCode={liveBestByCode} />
+            </div>
+            
+            <LapChart
+              results={results} drivers={drivers}
+              chartData={chartData}
+              totalLaps={race.laps} currentLap={lap}
+              selectedCode={selectedCode} />
+            <TyreStrategy
+              results={results} drivers={drivers}
+              totalLaps={race.laps} currentLap={lap}
+              rankings={rankings}
+              stintsByCode={stintsByCode}
+              selectedCode={selectedCode} onSelect={setSelectedCode} />
+
+            <BottomRaceDrawer
+              
+              race={race}
+              currentLap={lap}
+              results={results}
+              drivers={drivers}
+              rankings={rankings}
+            />
+            
+          </main>
+        </div>
       </div>
     </div>
   );

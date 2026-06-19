@@ -24,6 +24,7 @@ from app.services.openf1 import (
     get_location_for_lap,
     get_location_bounds,
     get_intervals,
+    get_race_control,
 )
 from app.services.ai import ask
 
@@ -317,3 +318,19 @@ def location_bounds(session_key: int):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/race-controls")
+def race_controls(session_key: int):
+    """
+    Return all safety car and virtual safety car intervals for a session.
+    Each entry has start_lap, end_lap, and type (SC or VSC).
+
+    Example: GET /race-controls?session_key=9158
+    """
+    try:
+        controls = get_race_control(session_key)
+        return {"session_key": session_key, "count": len(controls), "controls": controls}
+       
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))     

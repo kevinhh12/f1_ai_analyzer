@@ -315,3 +315,8 @@ def get_intervals(session_key: int) -> list:
     key = f"intervals_{session_key}"
     return _ttl_get(key, lambda: _get("intervals", {"session_key": session_key}), ttl=_ttl_for(session_key, TTL_LIVE_POSITION))
 
+def get_race_control(session_key: int) -> list:
+    """All race control messages for a session, ordered by time."""
+    key = f"race_control_{session_key}"
+    return _ttl_get(key, lambda: _get("race_control", {"session_key": session_key}), ttl=_ttl_for(session_key, TTL_LIVE_POSITION))
+

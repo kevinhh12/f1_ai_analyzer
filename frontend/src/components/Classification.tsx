@@ -15,9 +15,10 @@ interface Props {
   pitStops: any[];
   fastestLapCode?: string | null;
   activeSeason?: number;
+  liveBestByCode?: Record<string, string>;
 }
 
-export default function Classification({ results, drivers, selectedCode, onSelect, currentRanking, currentLap, stintsByCode, pitStops, fastestLapCode, activeSeason }: Props) {
+export default function Classification({ results, drivers, selectedCode, onSelect, currentRanking, currentLap, stintsByCode, pitStops, fastestLapCode, activeSeason, liveBestByCode }: Props) {
   const byCode = Object.fromEntries(drivers.map(d => [d.code, d]));
   const resultByCode = Object.fromEntries(results.map(r => [r.code, r]));
   // Map driver number → code for pit stop lookups
@@ -88,7 +89,7 @@ export default function Classification({ results, drivers, selectedCode, onSelec
                 </div>
                 <span className="cl-h tm" style={{ color: d.color }}>{d.team.toUpperCase()}</span>
               </div>
-              <span className="cl-h best">{r.best}</span>
+              <span className="cl-h best">{liveBestByCode?.[code] ?? '—'}</span>
               <span className="cl-h tyre">
                 {usedCompounds.map((t, i) => (
                   <span
