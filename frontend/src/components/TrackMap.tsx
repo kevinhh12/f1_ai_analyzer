@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 
 interface Sample { date: string; x: number; y: number; }
 interface Bounds { x_min: number; x_max: number; y_min: number; y_max: number; }
@@ -6,22 +6,28 @@ interface Bounds { x_min: number; x_max: number; y_min: number; y_max: number; }
 interface Props {
   sessionKey: number;
   lap: number;
+  totalLaps: number;
   currentTimeMs: number;
   raceStartEpoch: number;
   drivers: { num: string; code: string; color: string }[];
+  lastLapByNum?: Record<string, number>;
 }
 
-export default function TrackMap({ sessionKey, lap, currentTimeMs, raceStartEpoch, drivers }: Props) {
+export default function TrackMap({ sessionKey, lap, totalLaps, currentTimeMs, raceStartEpoch, drivers, lastLapByNum }: Props) {
   const base = import.meta.env.VITE_API_URL;
 
   const [bounds, setBounds] = useState<Bounds | null>(null);
   const [outlineSamples, setOutlineSamples] = useState<Sample[]>([]);
   const [lapSamples, setLapSamples] = useState<Record<string, Sample[]>>({});
 
+  // Per-session lap cache: avoids re-fetching a lap already loaded this session
+  const lapCache = useRef<Map<number, Record<string, Sample[]>>>(new Map());
+
   useEffect(() => {
     if (!sessionKey) return;
     setBounds(null);
     setOutlineSamples([]);
+    lapCache.current = new Map(); // clear on session change
 
     Promise.all([
       fetch(`${base}/api/location-bounds?session_key=${sessionKey}`).then(r => r.json()),
@@ -36,16 +42,59 @@ export default function TrackMap({ sessionKey, lap, currentTimeMs, raceStartEpoc
 
         const best = driverSamples.reduce((a, b) => a.length >= b.length ? a : b);
         setOutlineSamples([...best].sort((a, b) => a.date.localeCompare(b.date)));
+
+        // Seed lap 1 into cache so it doesn't get re-fetched
+        if (lap1Data.drivers) lapCache.current.set(1, lap1Data.drivers);
       })
       .catch(() => {});
   }, [sessionKey]);
 
+  // Background prefetch: warm the cache for all laps in batches of 4 so scrubbing never hits the network
+  useEffect(() => {
+    if (!sessionKey || !totalLaps) return;
+    let cancelled = false;
+
+    async function prefetchAll() {
+      const BATCH = 4;
+      for (let l = 1; l <= totalLaps && !cancelled; l += BATCH) {
+        const batch = Array.from({ length: Math.min(BATCH, totalLaps - l + 1) }, (_, i) => l + i);
+        await Promise.all(batch.map(async (lapNum) => {
+          if (lapCache.current.has(lapNum)) return;
+          try {
+            const data = await fetch(`${base}/api/location?session_key=${sessionKey}&lap=${lapNum}`).then(r => r.json());
+            if (!cancelled && data.drivers) lapCache.current.set(lapNum, data.drivers);
+          } catch {}
+        }));
+      }
+    }
+
+    prefetchAll();
+    return () => { cancelled = true; };
+  }, [sessionKey, totalLaps]);
+
+  // Debounced lap fetch — 250ms delay prevents flooding during fast scrubbing
   useEffect(() => {
     if (!sessionKey || !lap) return;
-    fetch(`${base}/api/location?session_key=${sessionKey}&lap=${lap}`)
-      .then(r => r.json())
-      .then(data => setLapSamples(data.drivers ?? {}))
-      .catch(() => {});
+
+    // Serve from cache immediately if available
+    const cached = lapCache.current.get(lap);
+    if (cached) {
+      setLapSamples(cached);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      fetch(`${base}/api/location?session_key=${sessionKey}&lap=${lap}`)
+        .then(r => r.json())
+        .then(data => {
+          const drivers = data.drivers ?? {};
+          lapCache.current.set(lap, drivers);
+          setLapSamples(drivers);
+        })
+        .catch(() => {});
+    }, 250);
+
+    return () => clearTimeout(timer);
   }, [sessionKey, lap]);
 
   const viewBox = useMemo(() => {
@@ -70,6 +119,8 @@ export default function TrackMap({ sessionKey, lap, currentTimeMs, raceStartEpoc
     const targetEpoch = raceStartEpoch + currentTimeMs;
 
     for (const [num, samples] of Object.entries(lapSamples)) {
+      // +1 tolerance: lapped finishers (1 lap behind leader) stay visible; genuine DNFs don't
+      if (lastLapByNum && lastLapByNum[num] != null && lap > lastLapByNum[num] + 1) continue;
 
       const driver = byNum[num];
       if (!driver || !samples.length) continue;
@@ -85,7 +136,7 @@ export default function TrackMap({ sessionKey, lap, currentTimeMs, raceStartEpoc
       result.push({ code: driver.code, color: driver.color, x: closest.x, y: -closest.y });
     }
     return result;
-  }, [lapSamples, bounds, drivers, currentTimeMs, raceStartEpoch]);
+  }, [lapSamples, bounds, drivers, currentTimeMs, raceStartEpoch, lap, lastLapByNum]);
 
   const dotR = useMemo(() => {
     if (!bounds) return 50;

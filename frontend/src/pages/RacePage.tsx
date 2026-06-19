@@ -200,7 +200,7 @@ export default function RacePage() {
 
   useEffect(() => {
     const base = import.meta.env.VITE_API_URL;
-    const seasons = [2025, 2024, 2023];
+    const seasons = [2026,2025, 2024, 2023];
     Promise.all(
       seasons.map(s =>
         fetch(`${base}/api/races?season=${s}`)
@@ -243,6 +243,8 @@ export default function RacePage() {
   const [dataLoading, setDataLoading] = useState(false);
   const [weatherReadings, setWeatherReadings] = useState<any[]>([]);
   const [lapTimestamps, setLapTimestamps] = useState<string[]>([]); // index = lap-1, value = date_start
+  const [raceDurationMs, setRaceDurationMs] = useState(0);
+  const [lastLapByNum, setLastLapByNum] = useState<Record<string, number>>({});
 
   // Derive current lap from the time scrubber position
   const lap = useMemo(() => {
@@ -258,9 +260,6 @@ export default function RacePage() {
     return l;
   }, [currentTimeMs, lapStartOffsets]);
 
-  const raceDurationMs = lapStartOffsets.length > 0
-    ? lapStartOffsets[lapStartOffsets.length - 1]
-    : 0;
 
   // When a race is picked, fetch real lap count + drivers
   useEffect(() => {
@@ -298,6 +297,16 @@ export default function RacePage() {
         setRawIntervals(intervalData.intervals ?? []);
 
         if (lapData.laps?.length) {
+          // Last lap completed per driver — distinguishes DNFs (few laps) from finishers
+          const lastLap: Record<string, number> = {};
+          for (const l of lapData.laps) {
+            const num = String(l.driver_number);
+            if (num && l.lap_number && (!lastLap[num] || l.lap_number > lastLap[num])) {
+              lastLap[num] = l.lap_number;
+            }
+          }
+          setLastLapByNum(lastLap);
+
           // Build lap→timestamp map: for each lap number, take the earliest date_start across all drivers
           const lapDateMap: Record<number, string> = {};
           for (const lap of lapData.laps) {
@@ -315,10 +324,21 @@ export default function RacePage() {
           const offsets = timestamps.map(ts => ts ? new Date(ts).getTime() - raceStartEpoch : 0);
           setLapStartOffsets(offsets);
 
-          // For finished races, start the scrubber at the last lap
+          // Race ends when the LAST driver crosses the finish line.
+          // Sum date_start + lap_duration for every lap row and take the maximum.
+          let raceEndEpoch = raceStartEpoch;
+          for (const l of lapData.laps) {
+            if (l.date_start && l.lap_duration) {
+              const end = new Date(l.date_start).getTime() + l.lap_duration * 1000;
+              if (end > raceEndEpoch) raceEndEpoch = end;
+            }
+          }
+          setRaceDurationMs(raceEndEpoch - raceStartEpoch);
+
+          // For finished races, start the scrubber at the end
           const today = new Date().toISOString().slice(0, 10);
-          if (race.date < today && offsets.length > 0) {
-            setCurrentTimeMs(offsets[offsets.length - 1]);
+          if (race.date < today) {
+            setCurrentTimeMs(raceEndEpoch - raceStartEpoch);
           }
 
           const rawPositions = posData.positions ?? [];
@@ -451,6 +471,8 @@ export default function RacePage() {
     setRawPositions([]);
     setRawIntervals([]);
     setNumToCode({});
+    setRaceDurationMs(0);
+    setLastLapByNum({});
   }, [race?.session_key]);
 
   if (loading || !race) {
@@ -522,9 +544,11 @@ export default function RacePage() {
             <TrackMap
               sessionKey={race.session_key!}
               lap={lap}
+              totalLaps={race.laps}
               currentTimeMs={currentTimeMs}
               raceStartEpoch={raceStartEpoch}
               drivers={drivers}
+              lastLapByNum={lastLapByNum}
             />
             <Classification
               results={results} drivers={drivers}
