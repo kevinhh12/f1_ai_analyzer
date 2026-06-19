@@ -21,6 +21,8 @@ from app.services.openf1 import (
     get_session_key,
     get_total_laps,
     get_weather,
+    get_location_for_lap,
+    get_location_bounds,
 )
 from app.services.ai import ask
 
@@ -262,5 +264,40 @@ def weather(session_key: int):
             for e in entries
         ]
         return {"session_key": session_key, "readings": readings}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/location")
+def location(session_key: int, lap: int):
+    """
+    Location samples for all drivers during a single lap.
+    Returns per-driver arrays of {date, x, y} plus the lap's time window.
+    Designed for smooth playback: fetch lap N+1 while N is playing.
+
+    Example: GET /location?session_key=9158&lap=1
+    """
+    try:
+        data = get_location_for_lap(session_key, lap)
+        return {"session_key": session_key, "lap": lap, **data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/location-bounds")
+def location_bounds(session_key: int):
+    """
+    Min/max X and Y coordinates for the session circuit.
+    Fetch once per session to build the SVG normalization constants.
+
+    Example: GET /location-bounds?session_key=9158
+    """
+    try:
+        bounds = get_location_bounds(session_key)
+        if not bounds:
+            raise HTTPException(status_code=404, detail="No location data available")
+        return {"session_key": session_key, **bounds}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

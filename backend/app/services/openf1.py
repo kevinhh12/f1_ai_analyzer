@@ -152,6 +152,115 @@ def get_location(session_key: int) -> dict:
 
 # ── Live data — TTL cache (stale data = wrong live standings) ─────────────────
 
+def get_location_for_lap(session_key: int, lap: int) -> dict:
+    """
+    All location samples for a single lap, grouped by driver_number.
+    Uses lap boundary timestamps derived from the lap data to slice the
+    location stream — keeps each response small (~400 rows) instead of
+    returning the full ~1M-row session dataset.
+
+    Returns:
+        {
+          "from": <ISO timestamp>,
+          "to":   <ISO timestamp>,
+          "drivers": {
+            "<driver_number>": [{"date": ..., "x": ..., "y": ...}, ...]
+          }
+        }
+    """
+    cache_key = f"location_lap_{session_key}_{lap}"
+    ttl = _ttl_for(session_key, TTL_LIVE_LAPS)
+
+    def fetch():
+        laps = _get("laps", {"session_key": session_key})
+
+        # Collect all rows for the requested lap number
+        lap_rows = []
+        for row in laps:
+            if row.get("lap_number") == lap:
+                lap_rows.append(row)
+
+        if not lap_rows:
+            return {"from": None, "to": None, "drivers": {}}
+
+        # Earliest date_start across all drivers = lap start
+        starts = []
+        for row in lap_rows:
+            if row.get("date_start"):
+                starts.append(row["date_start"])
+
+        if not starts:
+            return {"from": None, "to": None, "drivers": {}}
+
+        t_from = min(starts)
+
+        # Earliest date_start of the next lap = current lap end
+        next_lap_starts = []
+        for row in laps:
+            if row.get("lap_number") == lap + 1 and row.get("date_start"):
+                next_lap_starts.append(row["date_start"])
+
+        t_to = min(next_lap_starts) if next_lap_starts else None
+
+        # Query OpenF1 location endpoint with the time window
+        params: dict = {
+            "session_key": session_key,
+            "date>": t_from,
+        }
+        if t_to:
+            params["date<"] = t_to
+
+        samples = _get("location", params)
+
+        # Group samples by driver number
+        grouped: dict[str, list] = {}
+        for s in samples:
+            num = str(s.get("driver_number", ""))
+            if not num:
+                continue
+            if num not in grouped:
+                grouped[num] = []
+            grouped[num].append({
+                "date": s.get("date"),
+                "x":    s.get("x"),
+                "y":    s.get("y"),
+            })
+
+        return {"from": t_from, "to": t_to, "drivers": grouped}
+
+    return _ttl_get(cache_key, fetch, ttl=ttl)
+
+
+def get_location_bounds(session_key: int) -> dict:
+    """
+    Min/max X and Y across the entire session — used by the frontend to
+    normalize driver coordinates into a fixed SVG viewBox.
+    Derived from lap 1 location data (covers the full circuit outline).
+    Cached permanently for finished sessions.
+    """
+    cache_key = f"location_bounds_{session_key}"
+    ttl = _ttl_for(session_key, TTL_LIVE_LAPS)
+
+    def fetch():
+        # Lap 1 traces the full circuit — enough to establish coordinate bounds
+        lap1 = get_location_for_lap(session_key, 1)
+
+        xs = []
+        ys = []
+        for driver_samples in lap1["drivers"].values():
+            for s in driver_samples:
+                if s.get("x") is not None:
+                    xs.append(s["x"])
+                if s.get("y") is not None:
+                    ys.append(s["y"])
+
+        if not xs:
+            return {}
+        return {"x_min": min(xs), "x_max": max(xs), "y_min": min(ys), "y_max": max(ys)}
+
+    return _ttl_get(cache_key, fetch, ttl=ttl)
+
+
 def get_weather(session_key: int) -> list:
     """All weather readings for a session, ordered by time."""
     key = f"weather_{session_key}"
