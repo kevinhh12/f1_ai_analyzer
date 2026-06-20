@@ -2912,6 +2912,7 @@ body {
   letter-spacing: 2px;
   color: rgba(255,255,255,.35);
   margin-left: auto;
+ 
 }
 
 .telem-card__gauge-wrap {
@@ -2924,6 +2925,10 @@ body {
   width: 100%;
   height: auto;
   overflow: visible;
+}
+
+.telem-arc {
+  transition: stroke-dashoffset 0.15s linear, stroke 0.3s ease;
 }
 
 .telem-card__center {

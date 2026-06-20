@@ -49,22 +49,20 @@ export default function TrackMap({ sessionKey, lap, totalLaps, currentTimeMs, ra
       .catch(() => {});
   }, [sessionKey]);
 
-  // Background prefetch: warm the cache for all laps in batches of 4 so scrubbing never hits the network
+  // Background prefetch: warm the cache sequentially with a delay to avoid rate-limiting OpenF1
   useEffect(() => {
     if (!sessionKey || !totalLaps) return;
     let cancelled = false;
 
     async function prefetchAll() {
-      const BATCH = 4;
-      for (let l = 1; l <= totalLaps && !cancelled; l += BATCH) {
-        const batch = Array.from({ length: Math.min(BATCH, totalLaps - l + 1) }, (_, i) => l + i);
-        await Promise.all(batch.map(async (lapNum) => {
-          if (lapCache.current.has(lapNum)) return;
-          try {
-            const data = await fetch(`${base}/api/location?session_key=${sessionKey}&lap=${lapNum}`).then(r => r.json());
-            if (!cancelled && data.drivers) lapCache.current.set(lapNum, data.drivers);
-          } catch {}
-        }));
+      for (let l = 1; l <= totalLaps && !cancelled; l++) {
+        if (lapCache.current.has(l)) continue;
+        try {
+          const data = await fetch(`${base}/api/location?session_key=${sessionKey}&lap=${l}`).then(r => r.json());
+          if (!cancelled && data.drivers) lapCache.current.set(l, data.drivers);
+        } catch {}
+        // 300ms gap between requests to stay under OpenF1 rate limits
+        await new Promise(res => setTimeout(res, 300));
       }
     }
 

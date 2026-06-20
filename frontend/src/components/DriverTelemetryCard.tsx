@@ -95,13 +95,20 @@ export default function DriverTelemetryCard({
   const rI = 126, wI = 22;
 
   const rpmP = clamp(telem.rpm / MAX_RPM, 0, 1);
-  const rpmEnd = 135 + 270 * rpmP;
-  const redStart = 135 + 270 * 0.86;
   const inRed = rpmP > 0.86;
   const rpmCol = inRed ? '#FF3B3B' : '#2D9CFF';
+  const redStart = 135 + 270 * 0.86;
 
-  const thrEnd = 135 + 132 * clamp(telem.throttle / 100, 0, 1);
-  const brkEnd = 273 + 132 * clamp(telem.brake / 100, 0, 1);
+  const thrP = clamp(telem.throttle / 100, 0, 1);
+  const brkP = clamp(telem.brake / 100, 0, 1);
+
+  // Arc lengths for stroke-dasharray/dashoffset animation
+  const rpmArcLen = rO * (270 * Math.PI / 180);   // full RPM arc length
+  const halfArcLen = rI * (132 * Math.PI / 180);   // throttle or brake arc length
+
+  const rpmOffset = rpmArcLen * (1 - rpmP);
+  const thrOffset = halfArcLen * (1 - thrP);
+  const brkOffset = halfArcLen * (1 - brkP);
 
   if (loading) {
     return (
@@ -133,25 +140,47 @@ export default function DriverTelemetryCard({
             <path id="tp-brk" d={arc(cx, cy, rI, 288, 388)} />
           </defs>
 
-          {/* Outer — RPM */}
+          {/* Outer — RPM background + red zone */}
           <path d={arc(cx, cy, rO, 135, 405)} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={wO} />
           <path d={arc(cx, cy, rO, redStart, 405)} fill="none" stroke="rgba(255,59,59,0.26)" strokeWidth={wO} />
-          <path d={arc(cx, cy, rO, 135, rpmEnd)} fill="none" stroke={rpmCol} strokeWidth={wO} strokeLinecap="butt" style={{ transition: 'all .12s linear' }} />
+          {/* RPM active — fixed path, animated via dashoffset */}
+          <path
+            d={arc(cx, cy, rO, 135, 405)}
+            fill="none" stroke={rpmCol} strokeWidth={wO} strokeLinecap="butt"
+            strokeDasharray={rpmArcLen}
+            strokeDashoffset={rpmOffset}
+            className="telem-arc"
+          />
 
-          {/* Inner — throttle / brake */}
+          {/* Inner — throttle / brake background */}
           <path d={arc(cx, cy, rI, 135, 405)} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={wI} />
-          <path d={arc(cx, cy, rI, 135, thrEnd)} fill="none" stroke="#28C76F" strokeWidth={wI} strokeLinecap="butt" style={{ transition: 'all .12s linear' }} />
-          <path d={arc(cx, cy, rI, 273, brkEnd)} fill="none" stroke="#FF3B3B" strokeWidth={wI} strokeLinecap="butt" style={{ transition: 'all .12s linear' }} />
+          {/* Throttle active */}
+          <path
+            d={arc(cx, cy, rI, 135, 267)}
+            fill="none" stroke="#28C76F" strokeWidth={wI} strokeLinecap="butt"
+            strokeDasharray={halfArcLen}
+            strokeDashoffset={thrOffset}
+            className="telem-arc"
+          />
+          {/* Brake active */}
+          <path
+            d={arc(cx, cy, rI, 273, 405)}
+            fill="none" stroke="#FF3B3B" strokeWidth={wI} strokeLinecap="butt"
+            strokeDasharray={halfArcLen}
+            strokeDashoffset={brkOffset}
+            className="telem-arc"
+          />
+          {/* Divider between throttle/brake */}
           <path d={arc(cx, cy, rI, 268, 272)} fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth={wI} />
 
           {/* Curved labels */}
-          <text fill="rgba(255,255,255,0.82)" fontSize="11" fontFamily="Saira, sans-serif" fontWeight="600" letterSpacing="2.5">
+          <text fill="rgba(255,255,255,0.82)" fontSize="11" fontFamily="Saira, sans-serif" fontWeight="600" letterSpacing="2.5" dominantBaseline="central">
             <textPath href="#tp-rpm" startOffset="50%" textAnchor="middle">RPM</textPath>
           </text>
-          <text fill="rgba(255,255,255,0.95)" fontSize="11" fontFamily="Saira, sans-serif" fontWeight="600" letterSpacing="2.5">
+          <text fill="rgba(255,255,255,0.95)" fontSize="11" fontFamily="Saira, sans-serif" fontWeight="600" letterSpacing="2.5" dominantBaseline="central">
             <textPath href="#tp-thr" startOffset="50%" textAnchor="middle">THROTTLE</textPath>
           </text>
-          <text fill="rgba(255,255,255,0.95)" fontSize="11" fontFamily="Saira, sans-serif" fontWeight="600" letterSpacing="2.5">
+          <text fill="rgba(255,255,255,0.95)" fontSize="11" fontFamily="Saira, sans-serif" fontWeight="600" letterSpacing="2.5" dominantBaseline="central">
             <textPath href="#tp-brk" startOffset="50%" textAnchor="middle">BRAKE</textPath>
           </text>
         </svg>

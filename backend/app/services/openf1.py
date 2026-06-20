@@ -172,7 +172,7 @@ def get_location_for_lap(session_key: int, lap: int) -> dict:
     ttl = _ttl_for(session_key, TTL_LIVE_LAPS)
 
     def fetch():
-        laps = _get("laps", {"session_key": session_key})
+        laps = get_lap_times(session_key)
 
         # Collect all rows for the requested lap number
         lap_rows = []
