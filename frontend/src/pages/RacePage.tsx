@@ -524,6 +524,86 @@ export default function RacePage() {
     setRawRaceControl([]);
   }, [race?.session_key]);
 
+  // Live polling: re-fetch volatile data every 10s for today's (live) races (untested)
+  const isLive = race?.date === new Date().toISOString().slice(0, 10);
+  useEffect(() => {
+    if (!isLive || !race?.session_key) return;
+    const key = race.session_key;
+    const base = import.meta.env.VITE_API_URL;
+
+    const poll = () => {
+      Promise.all([
+        fetch(`${base}/api/race-controls?session_key=${key}`).then(r => r.json()),
+        fetch(`${base}/api/position?session_key=${key}`).then(r => r.json()),
+        fetch(`${base}/api/intervals?session_key=${key}`).then(r => r.json()),
+        fetch(`${base}/api/laps?session_key=${key}`).then(r => r.json()),
+        fetch(`${base}/api/total-laps?session_key=${key}`).then(r => r.json()),
+        fetch(`${base}/api/pitstops?session_key=${key}`).then(r => r.json()),
+        fetch(`${base}/api/tyres?session_key=${key}`).then(r => r.json()),
+        fetch(`${base}/api/weather?session_key=${key}`).then(r => r.json()),
+      ])
+        .then(([rcData, posData, ivData, lapData, totalLapsData, pitData, tyreData, weatherData]) => {
+          setRawRaceControl(rcData.controls ?? []);
+          setRawPositions(posData.positions ?? []);
+          setRawIntervals(ivData.intervals ?? []);
+          if (pitData.pit_stops?.length) setPitStops(pitData.pit_stops);
+          if (weatherData.readings?.length) setWeatherReadings(weatherData.readings);
+
+          if (totalLapsData.total_laps) {
+            setRaces(prev => prev.map(r =>
+              r.session_key === key ? { ...r, laps: totalLapsData.total_laps } : r
+            ));
+          }
+
+          if (lapData.laps?.length) {
+            setRawLaps(lapData.laps);
+
+            const lastLap: Record<string, number> = {};
+            for (const l of lapData.laps) {
+              const num = String(l.driver_number);
+              if (num && l.lap_number && (!lastLap[num] || l.lap_number > lastLap[num])) {
+                lastLap[num] = l.lap_number;
+              }
+            }
+            setLastLapByNum(lastLap);
+
+            const lapDateMap: Record<number, string> = {};
+            for (const l of lapData.laps) {
+              const n = l.lap_number;
+              if (n && l.date_start && (!lapDateMap[n] || l.date_start < lapDateMap[n])) {
+                lapDateMap[n] = l.date_start;
+              }
+            }
+            const maxLap = Math.max(...Object.keys(lapDateMap).map(Number));
+            const timestamps = Array.from({ length: maxLap }, (_, i) => lapDateMap[i + 1] ?? '');
+            setLapTimestamps(timestamps);
+
+            const raceStart = timestamps[0] ? new Date(timestamps[0]).getTime() : 0;
+            const offsets = timestamps.map(ts => ts ? new Date(ts).getTime() - raceStart : 0);
+            setLapStartOffsets(offsets);
+
+            let raceEnd = raceStart;
+            for (const l of lapData.laps) {
+              if (l.date_start && l.lap_duration) {
+                const end = new Date(l.date_start).getTime() + l.lap_duration * 1000;
+                if (end > raceEnd) raceEnd = end;
+              }
+            }
+            setRaceDurationMs(raceEnd - raceStart);
+
+            if (tyreData.stints?.length) {
+              const stints = processStintData(tyreData.stints, numToCode as any, totalLapsData.total_laps ?? maxLap);
+              setStintsByCode(stints);
+            }
+          }
+        })
+        .catch(() => {});
+    };
+
+    const id = setInterval(poll, 10_000);
+    return () => clearInterval(id);
+  }, [isLive, race?.session_key]);
+
   // Scan all race control messages up to current time to determine caution state.
   // Only SC deployed, VSC deployed, and red flags trigger the glow.
   // Green only appears when EXITING one of those periods.
@@ -694,12 +774,14 @@ export default function RacePage() {
               selectedCode={selectedCode} onSelect={setSelectedCode} />
 
             <BottomRaceDrawer
-              
               race={race}
               currentLap={lap}
               results={results}
               drivers={drivers}
               rankings={rankings}
+              raceControlMessages={rawRaceControl}
+              currentTimeMs={currentTimeMs}
+              raceStartEpoch={raceStartEpoch}
             />
             
           </main>

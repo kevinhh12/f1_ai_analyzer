@@ -7,6 +7,7 @@ import {
 
 import { useState } from "react";
 import AiChat from "./AiChat";
+import RaceControlFeed from "./RaceControlFeed";
 import { type Race, type Result, type Driver, type LapRanking } from "../data";
 
 interface Props {
@@ -16,9 +17,12 @@ interface Props {
   results: Result[];
   drivers: Driver[];
   rankings: LapRanking[];
+  raceControlMessages?: any[];
+  currentTimeMs?: number;
+  raceStartEpoch?: number;
 }
 
-export default function BottomRaceDrawer({ hidden = false, race, currentLap, results, drivers, rankings }: Props) {
+export default function BottomRaceDrawer({ hidden = false, race, currentLap, results, drivers, rankings, raceControlMessages = [], currentTimeMs = 0, raceStartEpoch = 0 }: Props) {
   const [open, setOpen] = useState(false);
   if (hidden) return null;
 
@@ -36,13 +40,20 @@ export default function BottomRaceDrawer({ hidden = false, race, currentLap, res
       <DrawerOverlay className="fixed inset-0 bg-black/60" />
 
       <DrawerContent className="fixed bottom-0 left-0 right-0 h-[70vh] rounded-t-2xl border border-[#2a2d34] bg-[#131418] text-white focus:outline-none">
-        <AiChat
-          race={race}
-          currentLap={currentLap}
-          results={results}
-          drivers={drivers}
-          rankings={rankings}
-        />
+        <div className="rc-drawer-split pb-4">
+          <RaceControlFeed
+            messages={raceControlMessages}
+            currentTimeMs={currentTimeMs}
+            raceStartEpoch={raceStartEpoch}
+          />
+          <AiChat
+            race={race}
+            currentLap={currentLap}
+            results={results}
+            drivers={drivers}
+            rankings={rankings}
+          />
+        </div>
       </DrawerContent>
     </Drawer>
   );

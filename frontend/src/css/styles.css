@@ -2301,7 +2301,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 14px 18px;
+  padding: 13px 18px;
   border-bottom: 1px solid var(--border);
   background: var(--bg);
   flex-shrink: 0;
@@ -2704,4 +2704,124 @@ body {
 @keyframes pulse-green {
   0%, 100% { box-shadow: inset 0 0 30px rgba(0,210,122,0.5), inset 0 0 80px rgba(0,210,122,0.2), inset 0 0 150px rgba(0,210,122,0.08); }
   50%      { box-shadow: inset 0 0 50px rgba(0,210,122,0.7), inset 0 0 120px rgba(0,210,122,0.35), inset 0 0 200px rgba(0,210,122,0.15); }
+}
+
+/* ── Bottom drawer split layout ──────────────────────────────────────────── */
+.rc-drawer-split {
+  display: flex;
+  justify-content: space-between;
+  height: 100%;
+  gap: 1px;
+}
+
+.rc-drawer-split > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.rc-drawer-split > .rc-feed {
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ── Race Control Feed ───────────────────────────────────────────────────── */
+.rc-feed {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.rc-feed__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.rc-feed__header-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ffd400;
+  box-shadow: 0 0 6px rgba(255, 212, 0, 0.6);
+}
+
+.rc-feed__header-title {
+  font: 700 11px var(--font-mono, monospace);
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.rc-feed__header-badge {
+  font: 700 9px var(--font-mono, monospace);
+  letter-spacing: 0.1em;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(255, 212, 0, 0.15);
+  color: #ffd400;
+}
+
+.rc-feed__messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rc-feed__empty {
+  font: 400 12px var(--font-mono, monospace);
+  color: rgba(255, 255, 255, 0.25);
+  text-align: center;
+  padding: 40px 0;
+}
+
+.rc-feed__msg {
+  padding: 8px 12px;
+  border-left: 3px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 0 4px 4px 0;
+  transition: background 0.2s;
+}
+
+.rc-feed__msg:first-child {
+  animation: rc-msg-in 0.3s ease;
+}
+
+@keyframes rc-msg-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.rc-feed__msg-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+
+.rc-feed__msg-lap {
+  font: 700 9px var(--font-mono, monospace);
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.rc-feed__msg-time {
+  font: 400 9px var(--font-mono, monospace);
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.rc-feed__msg-cat {
+  font: 700 9px var(--font-mono, monospace);
+  letter-spacing: 0.08em;
+  margin-left: auto;
+}
+
+.rc-feed__msg-text {
+  font: 400 11px var(--font-mono, monospace);
+  color: rgba(255, 255, 255, 0.75);
+  line-height: 1.4;
 }
