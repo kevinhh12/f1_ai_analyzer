@@ -1385,7 +1385,7 @@ body {
 }
 .cl-head {
   display: grid;
-  grid-template-columns: 6% 4% 9% 22% 17% 15% 8% 8%;
+  grid-template-columns: 5.5% 4% 8% 22% 20% 11% 8%;
   align-items: center;
   gap: 8px;
 }

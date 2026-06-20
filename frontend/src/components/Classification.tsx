@@ -32,7 +32,7 @@ export default function Classification({ results, drivers, selectedCode, onSelec
   const teamLogoURL = (team: string) =>
     `https://media.formula1.com/image/upload/c_lfill,w_48/q_auto/v1740000001/common/f1/${activeSeason}/${team.toLowerCase().replace(/\s/g, '')}/${activeSeason}${team.toLowerCase().replace(/\s/g, '')}logowhite.webp`;
 
-  const rankedOrder: { code: string; pos: number; gapMs: number }[] = currentRanking
+  const rankedOrder: { code: string; pos: number; gapMs: number | string }[] = currentRanking
     ? currentRanking.order
     : results.map((r, i) => ({ code: r.code, pos: i + 1, gapMs: 0 }));
 
@@ -66,14 +66,19 @@ export default function Classification({ results, drivers, selectedCode, onSelec
           const hasFastestLap = code === fastestLapCode;
           const isDnf = gapMs === -1;
 
-          const realStints = stintsByCode[code];
+          // Pit count from API — only count stops with stop_duration > 0, by timestamp
+          const targetEpoch = (raceStartEpoch ?? 0) + (currentTimeMs ?? 0);
+          const livePits = pitStops.filter(p =>
+            numToCode[String(p.driver_number)] === code
+            && p.date
+            && new Date(p.date).getTime() <= targetEpoch
+          ).length;
 
-          // Derive pit count from stints that have started by currentLap (not raw pit data,
-          // which includes red-flag pit entries that inflate the count)
-          const revealedStints = realStints
-            ? realStints.filter(s => currentLap >= s.startLap)
+          // Stints from raw API data — count all stints that have started by currentLap
+          const rawStints = stintsByCode[code];
+          const revealedStints = rawStints
+            ? rawStints.filter(s => currentLap >= s.startLap)
             : [];
-          const livePits = Math.max(0, revealedStints.length - 1);
           const usedCompounds: string[] = revealedStints.length
             ? revealedStints.map(s => s.compound)
             : r.tyres.slice(0, r.stops + 1);
@@ -121,7 +126,6 @@ export default function Classification({ results, drivers, selectedCode, onSelec
                       num={d.num ?? r.num}
                       img={d.img}
                       usedCompounds={usedCompounds}
-                      pitStops={livePits}
                       bestLap={liveBestByCode?.[code]}
                       position={pos}
                       gap={formatGap(gapMs, pos)}

@@ -13,13 +13,12 @@ interface Props {
   num: string;
   img?: string;
   usedCompounds: string[];
-  pitStops: number;
   bestLap?: string;
   position: number;
   gap: string;
 }
 
-export default function DriverInfoCard({ code, name, team, color, num, img, usedCompounds, pitStops, bestLap, position, gap }: Props) {
+export default function DriverInfoCard({ code, name, team, color, num, img, usedCompounds, bestLap, position, gap }: Props) {
   return (
     <div className="di-card">
       {/* Driver header */}
@@ -51,10 +50,6 @@ export default function DriverInfoCard({ code, name, team, color, num, img, used
         <div className="di-card__stat">
           <span className="di-card__stat-label">BEST</span>
           <span className="di-card__stat-value">{bestLap ?? '—'}</span>
-        </div>
-        <div className="di-card__stat">
-          <span className="di-card__stat-label">PITS</span>
-          <span className="di-card__stat-value">{pitStops}</span>
         </div>
       </div>
 
