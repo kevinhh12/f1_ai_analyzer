@@ -342,11 +342,6 @@ export default function RacePage() {
           }
           setRaceDurationMs(raceEndEpoch - raceStartEpoch);
 
-          // For finished races, start the scrubber at the end
-          const today = new Date().toISOString().slice(0, 10);
-          if (race.date < today) {
-            setCurrentTimeMs(raceEndEpoch - raceStartEpoch);
-          }
 
           const rawPositions = posData.positions ?? [];
           const { chartData, rankings } = processRealLapData(lapData.laps, numToCode, rawPositions);
