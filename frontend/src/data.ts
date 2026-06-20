@@ -86,6 +86,7 @@ export interface Driver {
   name: string;
   team: string;
   color: string;
+  img: string;
 }
 
 export interface Result {
@@ -118,10 +119,11 @@ export type LapEntry = Record<string, number | null>;
 // Per-lap position + gap snapshot, used by the live ranking panel
 export interface LapRanking {
   lap: number;
-  order: { code: string; pos: number; gapMs: number }[];
+  order: { code: string; pos: number; gapMs: number | string }[];
 }
 
-export function formatGap(ms: number, pos: number): string {
+export function formatGap(ms: number | string, pos: number): string {
+  if (typeof ms === 'string') return ms.startsWith('+') ? ms : `+${ms}`;
   if (ms === 0 && pos === 1) return 'LEADER';
   if (ms === 0) return '+0.000';
   if (ms < 0) return 'DNF';

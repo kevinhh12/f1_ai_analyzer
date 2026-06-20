@@ -9,6 +9,7 @@ interface Props {
   currentLap: number;
   results: Result[];
   drivers: Driver[];
+  liveBestByCode?: Record<string, string>;
 }
 
 const COMPOUND_NAMES: Record<string, string> = {
@@ -24,31 +25,33 @@ function fmtMs(ms: number): string {
   return `${m}:${s}`;
 }
 
-export default function StatGrid({ chartData, stintsByCode, pitStops, rankings, currentLap, results, drivers }: Props) {
+export default function StatGrid({ chartData, stintsByCode, pitStops, rankings, currentLap, results, drivers, liveBestByCode }: Props) {
   const byCode = Object.fromEntries(drivers.map(d => [d.code, d]));
 
-  // ── 1. FASTEST LAP ──────────────────────────────────────────────────────────
+  // ── 1. FASTEST LAP — derived from time-aware liveBestByCode ────────────────
   const fastestLap = useMemo(() => {
-    let bestMs = Infinity, bestCode = '', bestLapNum = 0;
-    const limit = Math.min(currentLap, chartData.length);
-    for (let i = 0; i < limit; i++) {
-      const entry = chartData[i];
-      for (const [key, val] of Object.entries(entry)) {
-        if (key === 'lap' || key.endsWith('_pos') || key.endsWith('_gap')) continue;
-        // Exclude pit laps (> 120s) and invalid values
-        if (typeof val === 'number' && val > 0 && val < 120000 && val < bestMs) {
-          bestMs = val;
-          bestCode = key;
-          bestLapNum = entry.lap as number;
-        }
-      }
+    if (!liveBestByCode || !Object.keys(liveBestByCode).length) return null;
+    let bestMs = Infinity, bestCode = '';
+    for (const [code, timeStr] of Object.entries(liveBestByCode)) {
+      const parts = timeStr.split(':');
+      const ms = parseFloat(parts[0]) * 60000 + parseFloat(parts[1]) * 1000;
+      if (ms < bestMs) { bestMs = ms; bestCode = code; }
     }
     if (!bestCode) return null;
+    // Find which lap this time was set on (scan chartData for the matching ms)
+    let bestLapNum = 0;
+    for (const entry of chartData) {
+      const val = entry[bestCode];
+      if (typeof val === 'number' && Math.abs(val - bestMs) < 1) {
+        bestLapNum = entry.lap as number;
+        break;
+      }
+    }
     const compound = stintsByCode[bestCode]?.find(
       s => s.startLap <= bestLapNum && s.endLap >= bestLapNum
     )?.compound ?? null;
-    return { time: fmtMs(bestMs), code: bestCode, lap: bestLapNum, compound };
-  }, [chartData, stintsByCode, currentLap]);
+    return { time: liveBestByCode[bestCode], code: bestCode, lap: bestLapNum, compound };
+  }, [liveBestByCode, chartData, stintsByCode]);
 
   // ── 2. PIT STOPS ────────────────────────────────────────────────────────────
   const pitStats = useMemo(() => {

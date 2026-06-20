@@ -1,5 +1,6 @@
 import { type Driver, type Result, type LapRanking, type Stint, formatGap } from '../data';
 import DriverTelemetryCard from './DriverTelemetryCard';
+import DriverInfoCard from './DriverInfoCard';
 
 const TYRES: Record<string, string> = {
   S: '#ff2e2e', M: '#ffd400', H: '#f3f3f3', I: '#00d27a', W: '#2bb6ff',
@@ -50,7 +51,6 @@ export default function Classification({ results, drivers, selectedCode, onSelec
         <span className="cl-h drv">DRIVER</span>
         <span className="cl-h tm">TEAM</span>
         <span className="cl-h best">BEST LAP</span>
-        <span className="cl-h tyre">STINTS</span>
         <span className="cl-h stops">PITS</span>
         <span className="cl-h gap">GAP</span>
       </header>
@@ -64,24 +64,24 @@ export default function Classification({ results, drivers, selectedCode, onSelec
           const sel = code === selectedCode;
           const lead = pos === 1;
           const hasFastestLap = code === fastestLapCode;
+          const isDnf = gapMs === -1;
 
           const realStints = stintsByCode[code];
 
-          // Count pit stops from actual pit stop data (accurate lap numbers, handles red-flag restarts)
-          const livePits = pitStops.filter(p =>
-            numToCode[String(p.driver_number)] === code && p.lap_number <= currentLap
-          ).length;
-
-          // Show stints based on completed pit stops — avoids showing future stints when
-          // multiple stints share the same startLap (red flag / restart data from OpenF1)
-          const usedCompounds: string[] = realStints
-            ? realStints.slice(0, livePits + 1).map(s => s.compound)
+          // Derive pit count from stints that have started by currentLap (not raw pit data,
+          // which includes red-flag pit entries that inflate the count)
+          const revealedStints = realStints
+            ? realStints.filter(s => currentLap >= s.startLap)
+            : [];
+          const livePits = Math.max(0, revealedStints.length - 1);
+          const usedCompounds: string[] = revealedStints.length
+            ? revealedStints.map(s => s.compound)
             : r.tyres.slice(0, r.stops + 1);
 
           return (
             <div key={code} className="cl-entry">
               <button
-                className={"cl-row" + (lead ? " lead" : "") + (sel ? " sel" : "") + (hasFastestLap ? " fl" : "")}
+                className={"cl-row" + (lead ? " lead" : "") + (sel ? " sel" : "") + (hasFastestLap ? " fl" : "") + (isDnf ? " dnf" : "")}
                 onClick={() => onSelect(sel ? '' : code)}
                 style={{ borderLeftColor: hasFastestLap ? '#a855f7' : d.color }}
               >
@@ -95,21 +95,6 @@ export default function Classification({ results, drivers, selectedCode, onSelec
                   <span className="cl-h tm" style={{ color: d.color }}>{d.team.toUpperCase()}</span>
                 </div>
                 <span className="cl-h best">{liveBestByCode?.[code] ?? '—'}</span>
-                <span className="cl-h tyre">
-                  {usedCompounds.map((t, i) => (
-                    <span
-                      key={i}
-                      className="t-chip"
-                      title={t === 'S' ? 'SOFT' : t === 'M' ? 'MEDIUM' : t === 'H' ? 'HARD' : t === 'I' ? 'INTER' : 'WET'}
-                      style={{
-                        background: TYRES[t],
-                        color: t === 'M' || t === 'H' ? '#0a0b0d' : '#fff',
-                      }}
-                    >
-                      {t}
-                    </span>
-                  ))}
-                </span>
                 <span className="cl-h stops">{livePits}</span>
                 <span className="cl-h gap">{formatGap(gapMs,pos)}</span>
               </button>
@@ -128,6 +113,19 @@ export default function Classification({ results, drivers, selectedCode, onSelec
                     />
                   </div>
                   <div className="cl-expand__right">
+                    <DriverInfoCard
+                      code={code}
+                      name={d.name ?? code}
+                      team={d.team}
+                      color={d.color}
+                      num={d.num ?? r.num}
+                      img={d.img}
+                      usedCompounds={usedCompounds}
+                      pitStops={livePits}
+                      bestLap={liveBestByCode?.[code]}
+                      position={pos}
+                      gap={formatGap(gapMs, pos)}
+                    />
                   </div>
                 </div>
               )}

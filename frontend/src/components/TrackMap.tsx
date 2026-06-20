@@ -138,7 +138,7 @@ export default function TrackMap({ sessionKey, lap, totalLaps, currentTimeMs, ra
 
   const dotR = useMemo(() => {
     if (!bounds) return 50;
-    return Math.min(bounds.x_max - bounds.x_min, bounds.y_max - bounds.y_min) * 0.018;
+    return Math.max(bounds.x_max - bounds.x_min, bounds.y_max - bounds.y_min) * 0.012;
   }, [bounds]);
 
   return (
@@ -150,7 +150,7 @@ export default function TrackMap({ sessionKey, lap, totalLaps, currentTimeMs, ra
         {bounds && (
           <svg
             viewBox={viewBox}
-            className="tm-svg p-8"
+            className="tm-svg"
             preserveAspectRatio="xMidYMid meet"
           >
             <polyline

@@ -19,6 +19,7 @@ function adaptDriver(d: any): Driver {
     name: d.full_name.split(' ').map((w: string) =>
       w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
     ).join(' '),
+    img: d.headshot_url,
     team: d.team_name,
     color: '#' + (d.team_colour ?? '9ea2ac'),
   };
@@ -118,28 +119,27 @@ function fmtMs(ms: number) {
 
 interface CanvasHeadProps {
   race: Race; activeYear: number; lap: number;
-  rankings: LapRanking[]; chartData: LapEntry[]; drivers: Driver[];
+  rankings: LapRanking[]; drivers: Driver[];
   weather: Record<string, number | null>;
+  liveBestByCode: Record<string, string>;
 }
 
-function CanvasHead({ race, activeYear, lap, rankings, chartData, drivers, weather }: CanvasHeadProps) {
+function CanvasHead({ race, activeYear, lap, rankings, drivers, weather, liveBestByCode }: CanvasHeadProps) {
   const byCode = Object.fromEntries(drivers.map(d => [d.code, d]));
 
   const leaderCode = rankings[lap - 1]?.order[0]?.code ?? null;
   const leaderColor = leaderCode ? (byCode[leaderCode]?.color ?? '#e10600') : '#e10600';
 
   const fastestLap = useMemo(() => {
+    if (!Object.keys(liveBestByCode).length) return null;
     let bestMs = Infinity, bestCode = '';
-    for (const entry of chartData) {
-      for (const [key, val] of Object.entries(entry)) {
-        if (key === 'lap' || key.endsWith('_pos') || key.endsWith('_gap')) continue;
-        if (typeof val === 'number' && val > 0 && val < 120000 && val < bestMs) {
-          bestMs = val; bestCode = key;
-        }
-      }
+    for (const [code, timeStr] of Object.entries(liveBestByCode)) {
+      const parts = timeStr.split(':');
+      const ms = parseFloat(parts[0]) * 60000 + parseFloat(parts[1]) * 1000;
+      if (ms < bestMs) { bestMs = ms; bestCode = code; }
     }
-    return bestCode ? { time: fmtMs(bestMs), code: bestCode } : null;
-  }, [chartData]);
+    return bestCode ? { time: liveBestByCode[bestCode], code: bestCode } : null;
+  }, [liveBestByCode]);
 
   const flColor = fastestLap ? (byCode[fastestLap.code]?.color ?? '#a855f7') : '#a855f7';
 
@@ -291,7 +291,7 @@ export default function RacePage() {
         }
         if (weatherData.readings?.length) setWeatherReadings(weatherData.readings);
         if (driverData.drivers?.length) setDrivers(driverData.drivers.map(adaptDriver));
-        if (pitData.pit_stops?.length) setPitStops(pitData.pit_stops);
+        setPitStops(pitData.pit_stops ?? []);
         const numToCode: Record<string, string> = {};
         (driverData.drivers ?? []).forEach((d: any) => {
           numToCode[String(d.driver_number)] = d.name_acronym;
@@ -382,22 +382,6 @@ export default function RacePage() {
 
   const [selectedCode, setSelectedCode] = useState('');
 
-  // Driver who holds the fastest lap up to the current scrubber position
-  const fastestLapCode = useMemo(() => {
-    let bestMs = Infinity, bestCode = '';
-    const limit = Math.min(lap, chartData.length);
-    for (let i = 0; i < limit; i++) {
-      const entry = chartData[i];
-      for (const [key, val] of Object.entries(entry)) {
-        if (key === 'lap' || key.endsWith('_pos') || key.endsWith('_gap')) continue;
-        if (typeof val === 'number' && val > 0 && val < 120000 && val < bestMs) {
-          bestMs = val; bestCode = key;
-        }
-      }
-    }
-    return bestCode || null;
-  }, [chartData, lap]);
-
   const raceStartEpoch = lapTimestamps[0] ? new Date(lapTimestamps[0]).getTime() : 0;
 
   // Set of driver numbers that are still active at the current race time.
@@ -424,24 +408,38 @@ export default function RacePage() {
     if (!Object.keys(latestPos).length) return rankings[lap - 1] ?? null;
 
     // Latest gap_to_leader per driver from interval data up to current time
-    const latestGap: Record<string, number> = {};
+    const latestGap: Record<string, number | string> = {};
     for (const iv of rawIntervals) {
       if (!iv.date || iv.gap_to_leader == null) continue;
       const epoch = new Date(iv.date).getTime();
       if (epoch > targetEpoch) continue;
       const num = String(iv.driver_number);
-      latestGap[num] = iv.gap_to_leader * 1000; // seconds → ms
+      const raw = iv.gap_to_leader;
+      const gap = Number(raw);
+      if (!isNaN(gap)) {
+        latestGap[num] = gap * 1000;
+      } else if (typeof raw === 'string' && raw.includes('LAP')) {
+        latestGap[num] = raw;
+      }
     }
 
-    const order = Object.entries(latestPos)
-      .sort((a, b) => a[1].pos - b[1].pos)
-      .map(([num, { pos }]) => {
-        const code = numToCode[num] ?? num;
-        return { code, pos, gapMs: latestGap[num] ?? 0 };
-      });
+    const sorted = Object.entries(latestPos)
+      .sort((a, b) => a[1].pos - b[1].pos);
+
+    // If any driver ahead is lapped (string gap), all drivers behind must also be lapped
+    let seenLapped = false;
+    const order = sorted.map(([num, { pos }]) => {
+      const code = numToCode[num] ?? num;
+      const driverLastLap = lastLapByNum?.[num] ?? lap;
+      if (lap > driverLastLap + 1) return { code, pos, gapMs: -1 as number | string };
+      let gap: number | string = latestGap[num] ?? 0;
+      if (typeof gap === 'string') seenLapped = true;
+      if (seenLapped && typeof gap === 'number' && pos > 1) gap = '+1 LAP';
+      return { code, pos, gapMs: gap };
+    });
 
     return { lap, order };
-  }, [rawPositions, rawIntervals, currentTimeMs, raceStartEpoch, rankings, lap, numToCode]);
+  }, [rawPositions, rawIntervals, currentTimeMs, raceStartEpoch, rankings, lap, numToCode, lastLapByNum]);
 
   // Best lap per driver up to the current scrubber time — only counts laps completed before now
   const liveBestByCode = useMemo(() => {
@@ -449,7 +447,7 @@ export default function RacePage() {
     const targetEpoch = raceStartEpoch + currentTimeMs;
     const bestMs: Record<string, number> = {};
     for (const l of rawLaps) {
-      if (!l.date_start || !l.lap_duration || l.is_pit_out_lap || l.lap_number === 1) continue;
+      if (!l.date_start || !l.lap_duration || l.is_pit_out_lap) continue;
       const completedAt = new Date(l.date_start).getTime() + l.lap_duration * 1000;
       if (completedAt > targetEpoch) continue;
       const code = numToCode[String(l.driver_number)];
@@ -465,6 +463,18 @@ export default function RacePage() {
     }
     return out;
   }, [rawLaps, currentTimeMs, raceStartEpoch, numToCode]);
+
+  // Driver who holds the fastest lap up to the current scrubber position
+  const fastestLapCode = useMemo(() => {
+    if (!Object.keys(liveBestByCode).length) return null;
+    let bestMs = Infinity, bestCode = '';
+    for (const [code, timeStr] of Object.entries(liveBestByCode)) {
+      const parts = timeStr.split(':');
+      const ms = parseFloat(parts[0]) * 60000 + parseFloat(parts[1]) * 1000;
+      if (ms < bestMs) { bestMs = ms; bestCode = code; }
+    }
+    return bestCode || null;
+  }, [liveBestByCode]);
 
   // The most recent race control message up to the current scrubber time
   const raceControlStatus = useMemo(() => {
@@ -541,7 +551,7 @@ export default function RacePage() {
           setRawRaceControl(rcData.controls ?? []);
           setRawPositions(posData.positions ?? []);
           setRawIntervals(ivData.intervals ?? []);
-          if (pitData.pit_stops?.length) setPitStops(pitData.pit_stops);
+          setPitStops(pitData.pit_stops ?? []);
           if (weatherData.readings?.length) setWeatherReadings(weatherData.readings);
 
           if (totalLapsData.total_laps) {
@@ -718,8 +728,9 @@ export default function RacePage() {
             <CanvasHead
               race={race} activeYear={activeYear}
               lap={lap} rankings={rankings}
-              chartData={chartData} drivers={drivers}
+              drivers={drivers}
               weather={weather}
+              liveBestByCode={liveBestByCode}
             />
 
       
@@ -735,6 +746,7 @@ export default function RacePage() {
               chartData={chartData} stintsByCode={stintsByCode}
               pitStops={pitStops} rankings={rankings}
               currentLap={lap} results={results} drivers={drivers}
+              liveBestByCode={liveBestByCode}
             />
             <div id="map-classi" className='panel flex 2xl:!flex-row'>
               <TrackMap

@@ -1434,10 +1434,12 @@ body {
 
 .tm-canvas {
   position: relative;
-  width: 100%;
+  width: 450px;
+  height: 450px;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .tm-svg {
@@ -1526,6 +1528,14 @@ body {
 
 .cl-row.fl {
   background: rgba(168,85,247,.06);
+}
+
+.cl-row.dnf {
+  opacity: 0.35;
+}
+
+.cl-row.dnf .cl-h.gap {
+  color: #f97316;
 }
 
 .cl-row.lead .cl-h.pos {
@@ -3023,4 +3033,119 @@ body {
   font: 700 9px 'Rajdhani', sans-serif;
   letter-spacing: 1.5px;
   border: 1px solid;
+}
+
+/* ── Driver info card ────────────────────────────────────────────────────── */
+.di-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.di-card__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.di-card__photo-wrap {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 2px solid #9ea2ac;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: rgba(255,255,255,.04);
+}
+
+.di-card__photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.di-card__photo-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 700 14px var(--font-mono, monospace);
+  color: rgba(255,255,255,.4);
+}
+
+.di-card__info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.di-card__name {
+  font: 600 14px var(--font-head, sans-serif);
+  color: #fff;
+  letter-spacing: 0.3px;
+}
+
+.di-card__team {
+  font: 500 9px var(--font-mono, monospace);
+  letter-spacing: 1.5px;
+}
+
+.di-card__num {
+  font: 700 11px var(--font-mono, monospace);
+  letter-spacing: 0.5px;
+}
+
+.di-card__stats {
+  display: flex;
+  gap: 8px;
+}
+
+.di-card__stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 4px;
+  border-radius: 6px;
+  background: rgba(255,255,255,.03);
+  border: 1px solid rgba(255,255,255,.06);
+}
+
+.di-card__stat-label {
+  font: 500 7px var(--font-mono, monospace);
+  letter-spacing: 2px;
+  color: rgba(255,255,255,.35);
+}
+
+.di-card__stat-value {
+  font: 700 12px var(--font-mono, monospace);
+  color: #fff;
+}
+
+.di-card__tyres {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.di-card__tyres-label {
+  font: 500 7px var(--font-mono, monospace);
+  letter-spacing: 2px;
+  color: rgba(255,255,255,.35);
+}
+
+.di-card__tyres-list {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.di-card__tyre {
+  padding: 3px 8px;
+  border-radius: 4px;
+  font: 700 9px var(--font-mono, monospace);
+  letter-spacing: 1px;
 }
