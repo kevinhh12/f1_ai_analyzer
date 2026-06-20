@@ -1,4 +1,5 @@
 import { type Driver, type Result, type LapRanking, type Stint, formatGap } from '../data';
+import DriverTelemetryCard from './DriverTelemetryCard';
 
 const TYRES: Record<string, string> = {
   S: '#ff2e2e', M: '#ffd400', H: '#f3f3f3', I: '#00d27a', W: '#2bb6ff',
@@ -16,9 +17,13 @@ interface Props {
   fastestLapCode?: string | null;
   activeSeason?: number;
   liveBestByCode?: Record<string, string>;
+  sessionKey?: number;
+  lap?: number;
+  currentTimeMs?: number;
+  raceStartEpoch?: number;
 }
 
-export default function Classification({ results, drivers, selectedCode, onSelect, currentRanking, currentLap, stintsByCode, pitStops, fastestLapCode, activeSeason, liveBestByCode }: Props) {
+export default function Classification({ results, drivers, selectedCode, onSelect, currentRanking, currentLap, stintsByCode, pitStops, fastestLapCode, activeSeason, liveBestByCode, sessionKey, lap, currentTimeMs, raceStartEpoch }: Props) {
   const byCode = Object.fromEntries(drivers.map(d => [d.code, d]));
   const resultByCode = Object.fromEntries(results.map(r => [r.code, r]));
   // Map driver number → code for pit stop lookups
@@ -74,40 +79,59 @@ export default function Classification({ results, drivers, selectedCode, onSelec
             : r.tyres.slice(0, r.stops + 1);
 
           return (
-            <button
-              key={code}
-              className={"cl-row" + (lead ? " lead" : "") + (sel ? " sel" : "") + (hasFastestLap ? " fl" : "")}
-              onClick={() => onSelect(code)}
-              style={{ borderLeftColor: hasFastestLap ? '#a855f7' : d.color }}
-            >
-              <span className="cl-h pos">{lead ? 'P1' : pos}</span>
-              <span className="cl-h num">{d.num ?? r.num}</span>
-              <span className="cl-h drv"><strong>{code}</strong></span>
-              <div className='teams'>
-                <div className='logo-background' style={{ backgroundColor: d.color }}>
-                  <img className='logo' src={teamLogoURL(d.team)} alt={d.team} />
+            <div key={code} className="cl-entry">
+              <button
+                className={"cl-row" + (lead ? " lead" : "") + (sel ? " sel" : "") + (hasFastestLap ? " fl" : "")}
+                onClick={() => onSelect(sel ? '' : code)}
+                style={{ borderLeftColor: hasFastestLap ? '#a855f7' : d.color }}
+              >
+                <span className="cl-h pos">{lead ? 'P1' : pos}</span>
+                <span className="cl-h num">{d.num ?? r.num}</span>
+                <span className="cl-h drv"><strong>{code}</strong></span>
+                <div className='teams'>
+                  <div className='logo-background' style={{ backgroundColor: d.color }}>
+                    <img className='logo' src={teamLogoURL(d.team)} alt={d.team} />
+                  </div>
+                  <span className="cl-h tm" style={{ color: d.color }}>{d.team.toUpperCase()}</span>
                 </div>
-                <span className="cl-h tm" style={{ color: d.color }}>{d.team.toUpperCase()}</span>
-              </div>
-              <span className="cl-h best">{liveBestByCode?.[code] ?? '—'}</span>
-              <span className="cl-h tyre">
-                {usedCompounds.map((t, i) => (
-                  <span
-                    key={i}
-                    className="t-chip"
-                    title={t === 'S' ? 'SOFT' : t === 'M' ? 'MEDIUM' : t === 'H' ? 'HARD' : t === 'I' ? 'INTER' : 'WET'}
-                    style={{
-                      background: TYRES[t],
-                      color: t === 'M' || t === 'H' ? '#0a0b0d' : '#fff',
-                    }}
-                  >
-                    {t}
-                  </span>
-                ))}
-              </span>
-              <span className="cl-h stops">{livePits}</span>
-              <span className="cl-h gap">{formatGap(gapMs,pos)}</span>
-            </button>
+                <span className="cl-h best">{liveBestByCode?.[code] ?? '—'}</span>
+                <span className="cl-h tyre">
+                  {usedCompounds.map((t, i) => (
+                    <span
+                      key={i}
+                      className="t-chip"
+                      title={t === 'S' ? 'SOFT' : t === 'M' ? 'MEDIUM' : t === 'H' ? 'HARD' : t === 'I' ? 'INTER' : 'WET'}
+                      style={{
+                        background: TYRES[t],
+                        color: t === 'M' || t === 'H' ? '#0a0b0d' : '#fff',
+                      }}
+                    >
+                      {t}
+                    </span>
+                  ))}
+                </span>
+                <span className="cl-h stops">{livePits}</span>
+                <span className="cl-h gap">{formatGap(gapMs,pos)}</span>
+              </button>
+
+              {sel && sessionKey && lap && currentTimeMs != null && raceStartEpoch != null && (
+                <div className="cl-expand" style={{ borderLeftColor: d.color }}>
+                  <div className="cl-expand__left">
+                    <DriverTelemetryCard
+                      sessionKey={sessionKey}
+                      driverNumber={d.num ?? r.num}
+                      driverCode={code}
+                      driverColor={d.color}
+                      lap={lap}
+                      currentTimeMs={currentTimeMs}
+                      raceStartEpoch={raceStartEpoch}
+                    />
+                  </div>
+                  <div className="cl-expand__right">
+                  </div>
+                </div>
+              )}
+            </div>
           );
         })}
       </div>

@@ -25,6 +25,7 @@ from app.services.openf1 import (
     get_location_bounds,
     get_intervals,
     get_race_control,
+    get_car_data_for_lap,
 )
 from app.services.ai import ask
 
@@ -331,6 +332,21 @@ def race_controls(session_key: int):
     try:
         controls = get_race_control(session_key)
         return {"session_key": session_key, "count": len(controls), "controls": controls}
-       
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))     
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/car-data")
+def car_data(session_key: int, driver_number: int, lap: int):
+    """
+    Car telemetry for one driver during one lap.
+    Returns speed, rpm, gear, throttle, brake, drs samples.
+
+    Example: GET /car-data?session_key=9158&driver_number=1&lap=5
+    """
+    try:
+        data = get_car_data_for_lap(session_key, driver_number, lap)
+        return {"session_key": session_key, "driver_number": driver_number, "lap": lap, **data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

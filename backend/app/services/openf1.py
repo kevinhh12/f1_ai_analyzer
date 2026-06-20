@@ -320,3 +320,49 @@ def get_race_control(session_key: int) -> list:
     key = f"race_control_{session_key}"
     return _ttl_get(key, lambda: _get("race_control", {"session_key": session_key}), ttl=_ttl_for(session_key, TTL_LIVE_POSITION))
 
+
+def get_car_data_for_lap(session_key: int, driver_number: int, lap: int) -> dict:
+    """Car telemetry for a single driver during one lap (speed, rpm, gear, throttle, brake, drs)."""
+    cache_key = f"car_data_{session_key}_{driver_number}_{lap}"
+    ttl = _ttl_for(session_key, TTL_LIVE_LAPS)
+
+    def fetch():
+        laps = get_lap_times(session_key)
+
+        lap_rows = [r for r in laps if r.get("lap_number") == lap]
+        if not lap_rows:
+            return {"from": None, "to": None, "samples": []}
+
+        starts = [r["date_start"] for r in lap_rows if r.get("date_start")]
+        if not starts:
+            return {"from": None, "to": None, "samples": []}
+
+        t_from = min(starts)
+        next_starts = [r["date_start"] for r in laps if r.get("lap_number") == lap + 1 and r.get("date_start")]
+        t_to = min(next_starts) if next_starts else None
+
+        params: dict = {
+            "session_key": session_key,
+            "driver_number": driver_number,
+            "date>": t_from,
+        }
+        if t_to:
+            params["date<"] = t_to
+
+        raw = _get("car_data", params)
+        samples = [
+            {
+                "date": s.get("date"),
+                "speed": s.get("speed", 0),
+                "rpm": s.get("rpm", 0),
+                "gear": s.get("n_gear", 0),
+                "throttle": s.get("throttle", 0),
+                "brake": s.get("brake", 0),
+                "drs": s.get("drs", 0),
+            }
+            for s in raw
+        ]
+        return {"from": t_from, "to": t_to, "samples": samples}
+
+    return _ttl_get(cache_key, fetch, ttl=ttl)
+

@@ -758,7 +758,11 @@ export default function RacePage() {
                 stintsByCode={stintsByCode}
                 pitStops={pitStops}
                 fastestLapCode={fastestLapCode} activeSeason={activeYear}
-                liveBestByCode={liveBestByCode} />
+                liveBestByCode={liveBestByCode}
+                sessionKey={race.session_key}
+                lap={lap}
+                currentTimeMs={currentTimeMs}
+                raceStartEpoch={raceStartEpoch} />
             </div>
             
             <LapChart
