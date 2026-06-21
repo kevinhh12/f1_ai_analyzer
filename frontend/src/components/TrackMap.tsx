@@ -29,6 +29,13 @@ export default function TrackMap({ sessionKey, lap, totalLaps, currentTimeMs, ra
     setOutlineSamples([]);
     lapCache.current = new Map(); // clear on session change
 
+    const pickOutline = (drivers: Record<string, Sample[]>) => {
+      const arr = Object.values(drivers) as Sample[][];
+      if (!arr.length) return;
+      const best = arr.reduce((a, b) => a.length >= b.length ? a : b);
+      setOutlineSamples([...best].sort((a, b) => a.date.localeCompare(b.date)));
+    };
+
     Promise.all([
       fetch(`${base}/api/location-bounds?session_key=${sessionKey}`).then(r => r.json()),
       fetch(`${base}/api/location?session_key=${sessionKey}&lap=1`).then(r => r.json()),
@@ -37,14 +44,22 @@ export default function TrackMap({ sessionKey, lap, totalLaps, currentTimeMs, ra
         if (boundsData.x_min == null) return;
         setBounds({ x_min: boundsData.x_min, x_max: boundsData.x_max, y_min: boundsData.y_min, y_max: boundsData.y_max });
 
-        const driverSamples = Object.values(lap1Data.drivers ?? {}) as Sample[][];
-        if (!driverSamples.length) return;
+        // Show lap 1 outline immediately — works for live races
+        if (lap1Data.drivers) {
+          lapCache.current.set(1, lap1Data.drivers);
+          pickOutline(lap1Data.drivers);
+        }
 
-        const best = driverSamples.reduce((a, b) => a.length >= b.length ? a : b);
-        setOutlineSamples([...best].sort((a, b) => a.date.localeCompare(b.date)));
-
-        // Seed lap 1 into cache so it doesn't get re-fetched
-        if (lap1Data.drivers) lapCache.current.set(1, lap1Data.drivers);
+        // Upgrade to lap 5 in background — racing speed gives denser samples in chicanes
+        fetch(`${base}/api/location?session_key=${sessionKey}&lap=5`)
+          .then(r => r.json())
+          .then(data => {
+            if (data.drivers && Object.keys(data.drivers).length) {
+              lapCache.current.set(5, data.drivers);
+              pickOutline(data.drivers);
+            }
+          })
+          .catch(() => {});
       })
       .catch(() => {});
   }, [sessionKey]);
