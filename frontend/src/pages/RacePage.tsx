@@ -9,7 +9,9 @@ import Sidebar from '../components/Sidebar';
 import TrackMap from '../components/TrackMap';
 import BottomRaceDrawer from '../components/BottomDrawer';
 import WeatherWidget from '../components/WeatherWidget';
+
 import {Link} from 'react-router-dom';
+import PopUps from '@/components/PopUps';
 
 
 function adaptDriver(d: any): Driver {
@@ -477,21 +479,6 @@ export default function RacePage() {
   }, [liveBestByCode]);
 
   // The most recent race control message up to the current scrubber time
-  const raceControlStatus = useMemo(() => {
-  if (!rawRaceControl.length || !raceStartEpoch) return null;
-  const targetEpoch = raceStartEpoch + currentTimeMs;
-
-  let latest: any = null;
-  for (const msg of rawRaceControl) {
-    if (!msg.date) continue;
-    const epoch = new Date(msg.date).getTime();
-    if (epoch > targetEpoch) continue;
-    if (!latest || epoch > new Date(latest.date).getTime()) {
-      latest = msg;
-    }
-  }
-  return latest;
-}, [rawRaceControl, currentTimeMs, raceStartEpoch]);
 
   // Weather reading closest to the current lap's timestamp
   const weather = useMemo(() => {
@@ -695,6 +682,8 @@ export default function RacePage() {
   return (
     <div className={`race-status ${activeGlow}`}>
       <div className="app">
+        
+        <PopUps messages={rawRaceControl} currentTimeMs={currentTimeMs} raceStartEpoch={raceStartEpoch} />
         <TopBar
           race={race}
           currentLap={lap}
