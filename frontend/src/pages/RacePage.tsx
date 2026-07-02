@@ -775,10 +775,8 @@ export default function RacePage() {
 
             <BottomRaceDrawer
               race={race}
+              sessionKey={race.session_key!}
               currentLap={lap}
-              results={results}
-              drivers={drivers}
-              rankings={rankings}
               raceControlMessages={rawRaceControl}
               currentTimeMs={currentTimeMs}
               raceStartEpoch={raceStartEpoch}

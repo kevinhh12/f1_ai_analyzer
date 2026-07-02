@@ -37,11 +37,9 @@ class ChatHistoryMessage(BaseModel):
     content: str
 
 class RaceContext(BaseModel):
+    session_key: int
     race: dict
     current_lap: int
-    standings: List[dict]
-    results: List[dict]
-    drivers: List[dict]
 
 class ChatRequest(BaseModel):
     message: str

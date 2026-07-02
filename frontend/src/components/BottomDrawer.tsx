@@ -8,21 +8,19 @@ import {
 import { useState } from "react";
 import AiChat from "./AiChat";
 import RaceControlFeed from "./RaceControlFeed";
-import { type Race, type Result, type Driver, type LapRanking } from "../data";
+import { type Race } from "../data";
 
 interface Props {
   hidden?: boolean;
   race: Race;
+  sessionKey: number;
   currentLap: number;
-  results: Result[];
-  drivers: Driver[];
-  rankings: LapRanking[];
   raceControlMessages?: any[];
   currentTimeMs?: number;
   raceStartEpoch?: number;
 }
 
-export default function BottomRaceDrawer({ hidden = false, race, currentLap, results, drivers, rankings, raceControlMessages = [], currentTimeMs = 0, raceStartEpoch = 0 }: Props) {
+export default function BottomRaceDrawer({ hidden = false, race, sessionKey, currentLap, raceControlMessages = [], currentTimeMs = 0, raceStartEpoch = 0 }: Props) {
   const [open, setOpen] = useState(false);
   if (hidden) return null;
 
@@ -48,10 +46,8 @@ export default function BottomRaceDrawer({ hidden = false, race, currentLap, res
           />
           <AiChat
             race={race}
+            sessionKey={sessionKey}
             currentLap={currentLap}
-            results={results}
-            drivers={drivers}
-            rankings={rankings}
           />
         </div>
       </DrawerContent>

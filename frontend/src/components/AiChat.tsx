@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { type Race, type Result, type Driver, type LapRanking, formatGap } from '../data';
+import { type Race } from '../data';
 
 type Role = 'user' | 'ai';
 
@@ -13,10 +13,8 @@ interface Message {
 
 interface Props {
   race: Race;
+  sessionKey: number;
   currentLap: number;
-  results: Result[];
-  drivers: Driver[];
-  rankings: LapRanking[];
 }
 
 const STORAGE_KEY = 'f1-chat-messages';
@@ -46,7 +44,7 @@ function loadMessages(): Message[] {
 
 let idCounter = Date.now();
 
-export default function AiChat({ race, currentLap, results, drivers, rankings }: Props) {
+export default function AiChat({ race, sessionKey, currentLap }: Props) {
   const [messages, setMessages] = useState<Message[]>(loadMessages);
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
@@ -61,16 +59,8 @@ export default function AiChat({ race, currentLap, results, drivers, rankings }:
   }, [messages, thinking]);
 
   function buildContext() {
-    const currentRanking = rankings[currentLap - 1];
-    const standings = currentRanking
-      ? currentRanking.order.map(o => ({
-          pos: o.pos,
-          code: o.code,
-          gap: formatGap(o.gapMs),
-        }))
-      : results.map((r, i) => ({ pos: i + 1, code: r.code, gap: i === 0 ? 'LEADER' : '—' }));
-
     return {
+      session_key: sessionKey,
       race: {
         name: race.name,
         year: race.year,
@@ -78,19 +68,6 @@ export default function AiChat({ race, currentLap, results, drivers, rankings }:
         total_laps: race.laps,
       },
       current_lap: currentLap,
-      standings,
-      results: results.map(r => ({
-        code: r.code,
-        best: r.best,
-        stops: r.stops,
-        tyres: r.tyres,
-      })),
-      drivers: drivers.map(d => ({
-        code: d.code,
-        name: d.name,
-        team: d.team,
-        num: d.num,
-      })),
     };
   }
 

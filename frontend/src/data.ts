@@ -193,7 +193,7 @@ export function buildResultsFromLaps(
         ? 'DNF'
         : lapsDown > 0
           ? `+${lapsDown} LAP${lapsDown > 1 ? 'S' : ''}`
-          : `+${(Math.abs(gapMs) / 1000).toFixed(3)}`;
+          : `+${(Math.abs(Number(gapMs)) / 1000).toFixed(3)}`;
 
     return {
       pos,
