@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { type Race } from '../data';
 
 interface Props {
@@ -8,94 +8,79 @@ interface Props {
   onPick: (race: Race) => void;
 }
 
-
-
 export default function Sidebar({ races, activeRound, activeYear, onPick }: Props) {
   const filteredRaces = races.filter(r => r.year === activeYear);
-
   const [activeView, setActiveView] = useState<string>("classification");
+  const [collapsed, setCollapsed] = useState(false);
+
+  // Force sidebar visible whenever viewport drops to tablet/mobile width,
+  // so a desktop-collapsed state doesn't carry over and hide the top-bar
+  // sidebar on smaller screens where the toggle button isn't shown.
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 1350px)');
+    const handler = (e: MediaQueryListEvent) => {
+      if (e.matches) setCollapsed(false);
+    };
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
-
     console.log(id, element);
-
     if (element) {
-      element.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-      });
-
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
       setActiveView(id);
     }
   };
 
   return (
-    <aside className="sidebar">
-      <div className="rail-eb">{activeYear} SEASON</div>
+    <>
+      <button
+        className="sidebar-toggle"
+        onClick={() => {
+          if (window.matchMedia('(max-width: 1350px)').matches) return;
+          setCollapsed(c => !c);
+        }}
+        aria-label={collapsed ? 'Show sidebar' : 'Hide sidebar'}
+        title={collapsed ? 'Show sidebar' : 'Hide sidebar'}
+      >
+        {collapsed ? '›' : '‹'}
+      </button>
 
-      <div className="rail-list">
-        {filteredRaces.map(r => (
-          <button
-            key={r.round}
-            className={
-              "rail-item" +
-              (r.round === activeRound && r.year === activeYear ? " active" : "")
-            }
-            onClick={() => onPick(r)}
-          >
-            <span className="rd">R{String(r.round).padStart(2, '0')}</span>
-            <span className="nm">{r.name}</span>
-            <span className="dt">{r.date}</span>
-          </button>
-        ))}
-      </div>
+      {!collapsed && (
+        <aside className="sidebar">
+          <div className="rail-eb">{activeYear} SEASON</div>
 
-      <div className="rail-eb" style={{ marginTop: 24 }}>VIEWS</div>
+          <div className="rail-list">
+            {filteredRaces.map(r => (
+              <button
+                key={r.round}
+                className={
+                  "rail-item" +
+                  (r.round === activeRound && r.year === activeYear ? " active" : "")
+                }
+                onClick={() => onPick(r)}
+              >
+                <span className="rd">R{String(r.round).padStart(2, '0')}</span>
+                <span className="nm">{r.name}</span>
+                <span className="dt">{r.date}</span>
+              </button>
+            ))}
+          </div>
 
-      <div className="rail-views">
-        <button
-          onClick={() => scrollToSection('summary')}
-          className={activeView === "summary" ? "rail-view active" : "rail-view"}
-        >
-          SUMMARY
-        </button>
-        
-        <button
-          onClick={() => scrollToSection('classification')}
-          className={activeView === "classification" ? "rail-view active" : "rail-view"}
-        >
-          CLASSIFICATION
-        </button>
+          <div className="rail-eb" style={{ marginTop: 24 }}>VIEWS</div>
 
-        <button
-          onClick={() => scrollToSection('lap-chart')}
-          className={activeView === "lap-chart" ? "rail-view active" : "rail-view"}
-        >
-          LAP CHART
-        </button>
-
-        <button
-          onClick={() => scrollToSection('tyre-strategy')}
-          className={activeView === "tyre-strategy" ? "rail-view active" : "rail-view"}
-        >
-          TYRE STRATEGY
-        </button>
-
-        <button
-          onClick={() => scrollToSection('telemetry')}
-          className={activeView === "telemetry" ? "rail-view active" : "rail-view"}
-        >
-          TELEMETRY
-        </button>
-
-        <button
-          onClick={() => scrollToSection('pit-stops')}
-          className={activeView === "pit-stops" ? "rail-view active" : "rail-view"}
-        >
-          PIT STOPS
-        </button>
-      </div>
-    </aside>
+          <div className="rail-views">
+            <button onClick={() => scrollToSection('summary')} className={activeView === "summary" ? "rail-view active" : "rail-view"}>SUMMARY</button>
+            <button onClick={() => scrollToSection('classification')} className={activeView === "classification" ? "rail-view active" : "rail-view"}>CLASSIFICATION</button>
+            <button onClick={() => scrollToSection('lap-chart')} className={activeView === "lap-chart" ? "rail-view active" : "rail-view"}>LAP CHART</button>
+            <button onClick={() => scrollToSection('tyre-strategy')} className={activeView === "tyre-strategy" ? "rail-view active" : "rail-view"}>TYRE STRATEGY</button>
+            <button onClick={() => scrollToSection('telemetry')} className={activeView === "telemetry" ? "rail-view active" : "rail-view"}>TELEMETRY</button>
+            <button onClick={() => scrollToSection('pit-stops')} className={activeView === "pit-stops" ? "rail-view active" : "rail-view"}>PIT STOPS</button>
+          </div>
+        </aside>
+      )}
+    </>
   );
 }

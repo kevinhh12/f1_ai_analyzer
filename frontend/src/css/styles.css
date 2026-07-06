@@ -1093,6 +1093,7 @@ body {
   display: grid;
   grid-template-columns: 240px 1fr;
   overflow: hidden;
+  position: relative;
 }
 
 /* ---------- SIDEBAR ---------- */
@@ -2080,6 +2081,7 @@ body {
   .shell {
     grid-template-columns: 1fr;
     grid-template-rows: auto 1fr;
+    position: relative;
   }
 
   .sidebar {
@@ -2094,6 +2096,10 @@ body {
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
     white-space: nowrap;
+  }
+
+  .sidebar-toggle {
+    display: none;
   }
 
   .rail-eb {
@@ -2135,6 +2141,43 @@ body {
     width: min(450px, 100%);
     height: auto;
     aspect-ratio: 1 / 1;
+  }
+}
+
+/* ===== 大屏（≥1351px）—— 侧边栏折叠按钮 ===== */
+@media (min-width: 1351px) {
+  .sidebar-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 50%;
+    left: 240px;
+    transform: translate(-50%, -50%);
+    width: 22px;
+    height: 22px;
+    z-index: 20;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    color: var(--fg-subtle);
+    cursor: pointer;
+    font: 700 13px var(--font-sans);
+    transition: left 200ms var(--ease-out);
+  }
+
+  .sidebar-toggle:hover {
+    background: var(--bg-raised);
+    color: var(--fg);
+  }
+
+  .shell:not(:has(.sidebar)) {
+    grid-template-columns: 1fr;
+  }
+
+  .shell:not(:has(.sidebar)) .sidebar-toggle {
+    left: -5px;
+    transform: translateY(-50%);
   }
 }
 
@@ -2203,7 +2246,6 @@ body {
     grid-template-columns: 1fr;
   }
 
-  /* 分类表/策略表比屏幕宽，允许左右滑动而不是挤压到看不清 */
   .cl-head, .cl-body {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -2245,7 +2287,7 @@ body {
 /* ===== 超小屏手机（≤420px）===== */
 @media (max-width: 420px) {
   .topbar .wm span:last-child {
-    display: none; /* 只显示 "F1"，隐藏 "ANALYZER" 省空间 */
+    display: none;
   }
 
   .canvas-head .eb {
@@ -2260,10 +2302,6 @@ body {
     font-size: 22px;
   }
 }
-
-/*
----break---
-*/
 
 @layer base {
   .theme {
