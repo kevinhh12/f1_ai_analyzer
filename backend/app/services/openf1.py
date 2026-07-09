@@ -13,6 +13,7 @@ Caching strategy:
     - Tyres/Pits: 60s (only changes on pit stops)
 """
 
+import random
 import time
 import threading
 import httpx
@@ -27,19 +28,67 @@ TTL_LIVE_LAPS     = 30
 TTL_LIVE_PITS     = 60
 TTL_FINISHED      = 7200 # past races never change
 
+# At most 3 outbound OpenF1 requests at a time — bounds in-flight connections.
+_openf1_semaphore = threading.Semaphore(3)
+
+# Rate limiter: OpenF1's free tier limits by requests-per-second, not concurrency.
+# A semaphore alone can't prevent 429s — 3 slots turning over every 200ms is
+# 15 req/s. This token-bucket spaces outbound requests >= MIN_INTERVAL apart
+# globally, keeping the rate at ~3 req/s no matter how many callers queue up.
+MIN_INTERVAL = 0.35  # seconds between outbound requests (~3 req/s)
+
+_rate_lock = threading.Lock()
+_next_slot = 0.0
+
+
+def _acquire_rate_slot() -> None:
+    """Block until this thread's turn to fire an outbound request."""
+    global _next_slot
+    with _rate_lock:
+        now = time.monotonic()
+        slot = max(now, _next_slot)
+        _next_slot = slot + MIN_INTERVAL
+    wait = slot - now
+    if wait > 0:
+        time.sleep(wait)
+
 
 # ── HTTP with retry/backoff ───────────────────────────────────────────────────
 
-def _get(endpoint: str, params: dict, retries: int = 4) -> list:
-    """GET with exponential backoff on 429 / 5xx."""
+def _get(endpoint: str, params: dict, retries: int = 3) -> list:
+    """Rate-limited GET with exponential backoff on 429 / 5xx.
+
+    Every attempt waits for a rate slot (~3 req/s globally) before firing.
+    On 429, the Retry-After header is honoured when present — OpenF1 tells us
+    exactly how long the limit window lasts, so guessing with backoff alone
+    tends to retry inside the same window and burn the attempt.
+
+    Worst case is bounded (~35s) because the caller (_ttl_get) holds a per-key
+    lock for the duration — an unbounded fetch would pin FastAPI threadpool
+    threads and exhaust the pool under load.
+    """
     for attempt in range(retries):
-        response = httpx.get(f"{BASE}/{endpoint}", params=params, timeout=30.0)
+        _acquire_rate_slot()
+        with _openf1_semaphore:
+            response = httpx.get(f"{BASE}/{endpoint}", params=params, timeout=10.0)
+
         if response.status_code == 429 or response.status_code >= 500:
             if attempt == retries - 1:
                 response.raise_for_status()
-            wait = 2 ** attempt  # 1s, 2s, 4s, 8s
+
+            retry_after = response.headers.get("Retry-After")
+            wait = 0.0
+            if retry_after is not None:
+                try:
+                    wait = float(retry_after) + random.uniform(0, 0.5)
+                except ValueError:
+                    wait = 0.0
+            if wait <= 0:
+                wait = (2 ** attempt) + random.uniform(0, 1)  # 1–2s, 2–3s
+
             time.sleep(wait)
             continue
+
         response.raise_for_status()
         return response.json()
     return []  # unreachable, but satisfies type checkers
@@ -47,15 +96,53 @@ def _get(endpoint: str, params: dict, retries: int = 4) -> list:
 
 # ── TTL cache with request coalescing ────────────────────────────────────────
 
+NEGATIVE_TTL = 60   # failed fetches are cached briefly — repeated garbage
+                    # session_keys can't bypass the cache and hammer OpenF1
+MAX_STORE    = 512  # hard cap on cached entries — laps/intervals blobs are MBs
+                    # each, an unbounded store is an OOM waiting to happen
+
 _ttl_store: dict[str, tuple[Any, float]] = {}
 _ttl_locks: dict[str, threading.Lock] = {}
 _ttl_meta_lock = threading.Lock()
+
+
+class _FetchFailure:
+    """Sentinel stored in place of a value when the upstream fetch raised."""
+    def __init__(self, message: str):
+        self.message = message
+
+
+def _store_put(key: str, value: Any, expires_at: float) -> None:
+    """Insert into the store, evicting expired then oldest entries past MAX_STORE.
+
+    Different keys are protected by different per-key locks (see _get_lock),
+    so without a lock around the shared dict here, concurrent inserts for
+    different keys could mutate _ttl_store while another thread's eviction
+    loop is iterating it (RuntimeError: dictionary changed size during
+    iteration). _ttl_meta_lock serializes all writes to the store itself.
+    """
+    with _ttl_meta_lock:
+        if len(_ttl_store) >= MAX_STORE:
+            now = time.time()
+            expired = [k for k, (_, exp) in _ttl_store.items() if exp < now]
+            for k in expired:
+                _ttl_store.pop(k, None)
+            while len(_ttl_store) >= MAX_STORE:
+                oldest = min(_ttl_store, key=lambda k: _ttl_store[k][1])
+                _ttl_store.pop(oldest, None)
+        _ttl_store[key] = (value, expires_at)
 
 
 def _get_lock(key: str) -> threading.Lock:
     with _ttl_meta_lock:
         if key not in _ttl_locks:
             _ttl_locks[key] = threading.Lock()
+            # Prune expired keys to prevent unbounded lock accumulation
+            if len(_ttl_locks) > 500:
+                now = time.time()
+                stale = [k for k in _ttl_locks if k not in _ttl_store or _ttl_store[k][1] < now]
+                for k in stale:
+                    _ttl_locks.pop(k, None)
         return _ttl_locks[key]
 
 
@@ -63,11 +150,14 @@ def _ttl_get(key: str, fetch_fn: Callable, ttl: int) -> Any:
     """
     Return cached value if still fresh, otherwise fetch once (coalescing
     concurrent callers so only one outbound request fires per cache miss).
+    Failed fetches are negatively cached for NEGATIVE_TTL seconds and re-raised.
     """
     now = time.time()
     if key in _ttl_store:
         value, expires_at = _ttl_store[key]
         if now < expires_at:
+            if isinstance(value, _FetchFailure):
+                raise RuntimeError(f"upstream fetch failed recently: {value.message}")
             return value
 
     lock = _get_lock(key)
@@ -77,34 +167,45 @@ def _ttl_get(key: str, fetch_fn: Callable, ttl: int) -> Any:
         if key in _ttl_store:
             value, expires_at = _ttl_store[key]
             if now < expires_at:
+                if isinstance(value, _FetchFailure):
+                    raise RuntimeError(f"upstream fetch failed recently: {value.message}")
                 return value
 
-        value = fetch_fn()
-        _ttl_store[key] = (value, now + ttl)
+        try:
+            value = fetch_fn()
+        except Exception as exc:
+            _store_put(key, _FetchFailure(str(exc)), now + NEGATIVE_TTL)
+            raise
+
+        _store_put(key, value, now + ttl)
         return value
-
-
-def _ttl_invalidate(key: str) -> None:
-    """Force-expire a cache entry so the next call fetches fresh data."""
-    _ttl_store.pop(key, None)
 
 
 # ── Session freshness helper ──────────────────────────────────────────────────
 
-@lru_cache(maxsize=128)
 def _session_is_finished(session_key: int) -> bool:
     """
     Return True if the session ended in the past.
-    Result is cached permanently — a finished session never becomes live again.
+    Finished sessions are cached permanently; live sessions re-check every 5 minutes
+    so the TTL can flip from short (live) to long (finished) during a session.
     """
-    sessions = _get("sessions", {"session_key": session_key})
-    if not sessions:
-        return False
-    date_end = sessions[0].get("date_end")
-    if not date_end:
-        return False
-    end_dt = datetime.fromisoformat(date_end.replace("Z", "+00:00"))
-    return end_dt < datetime.now(timezone.utc)
+    def fetch() -> bool:
+        sessions = _get("sessions", {"session_key": session_key})
+        if not sessions:
+            return False
+        date_end = sessions[0].get("date_end")
+        if not date_end:
+            return False
+        end_dt = datetime.fromisoformat(date_end.replace("Z", "+00:00"))
+        return end_dt < datetime.now(timezone.utc)
+
+    key = f"_finished_{session_key}"
+    # Once confirmed finished, cache forever; otherwise re-check every 5 min.
+    # `is True` guards against the _FetchFailure sentinel (truthy) being
+    # mistaken for a finished session.
+    if _ttl_store.get(key, (False, 0))[0] is True:
+        return _ttl_get(key, fetch, ttl=TTL_FINISHED)
+    return _ttl_get(key, fetch, ttl=300)
 
 
 def _ttl_for(session_key: int, live_ttl: int) -> int:
@@ -140,15 +241,6 @@ def get_session_key(season: int, circuit: str) -> int:
 def get_drivers(session_key: int) -> list:
     """Driver info for a session — static, never changes."""
     return _get("drivers", {"session_key": session_key})
-
-@lru_cache(maxsize=32)
-def get_location(session_key: int) -> dict:
-    # Unfinished
-    """Location info for a session — static, never changes."""
-    locations = _get("location", {"session_key": session_key})
-    return locations[0] if locations else {}
-
-
 
 # ── Live data — TTL cache (stale data = wrong live standings) ─────────────────
 
@@ -281,7 +373,7 @@ def get_total_laps(session_key: int):
     """
     key = f"total_laps_{session_key}"
     def fetch():
-        laps = _get("laps", {"session_key": session_key})
+        laps = get_lap_times(session_key)
         if not laps:
             return None
         return max(lap["lap_number"] for lap in laps if lap.get("lap_number"))

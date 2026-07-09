@@ -199,23 +199,37 @@ export default function RacePage() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [results, setResults] = useState<Result[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dataError, setDataError] = useState(false);
 
   useEffect(() => {
     const base = import.meta.env.VITE_API_URL;
-    const seasons = [2026,2025, 2024, 2023];
-    Promise.all(
-      seasons.map(s =>
-        fetch(`${base}/api/races?season=${s}`)
-          .then(r => r.json())
-          .then(data => (data.races ?? []).map((session: any, i: number) => adaptRace({ ...session, year: s }, i)))
-          .catch(() => [] as Race[])
-      )
-    )
-      .then(results => {
-        const all = results.flat();
-        if (all.length > 0) setRaces(all);
-      })
-      .finally(() => setLoading(false));
+    const seasons = [2026, 2025, 2024, 2023];
+
+    const fetchSeason = (s: number): Promise<Race[]> =>
+      fetch(`${base}/api/races?season=${s}`)
+        .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+        .then(data => (data.races ?? []).map((session: any, i: number) => adaptRace({ ...session, year: s }, i)))
+        .catch(() => [] as Race[]);
+
+    // Fetch seasons one at a time — firing all 4 simultaneously triggers 429s on OpenF1.
+    // 2026 loads first so the UI renders immediately; older seasons append in the background.
+    let cancelled = false;
+    (async () => {
+      for (const s of seasons) {
+        if (cancelled) break;
+        const races = await fetchSeason(s);
+        if (!cancelled && races.length > 0) {
+          setRaces(prev => {
+            const existing = new Set(prev.map(r => r.session_key));
+            const fresh = races.filter(r => !existing.has(r.session_key));
+            return fresh.length > 0 ? [...prev, ...fresh] : prev;
+          });
+        }
+        if (s === seasons[0]) setLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
   }, []);
 
   // Restore the previously selected race by session_key — only once on first load
@@ -266,120 +280,124 @@ export default function RacePage() {
   }, [currentTimeMs, lapStartOffsets]);
 
 
-  // When a race is picked, fetch real lap count + drivers
+  // When a race is picked, fetch all race data in one request.
+  // A single /race-data call replaces 9 parallel calls — prevents the thundering herd
+  // that was triggering 429s on OpenF1. AbortController cancels the single in-flight
+  // request immediately when the user switches races.
   useEffect(() => {
     if (!race?.session_key) return;
     const key = race.session_key;
     const base = import.meta.env.VITE_API_URL;
+    const controller = new AbortController();
+    const { signal } = controller;
 
-    // Fetch all race data in one shot so the canvas only renders when everything is ready
     setDataLoading(true);
-    Promise.all([
-      fetch(`${base}/api/total-laps?session_key=${key}`).then(r => r.json()),
-      fetch(`${base}/api/laps?session_key=${key}`).then(r => r.json()),
-      fetch(`${base}/api/tyres?session_key=${key}`).then(r => r.json()),
-      fetch(`${base}/api/drivers?session_key=${key}`).then(r => r.json()),
-      fetch(`${base}/api/pitstops?session_key=${key}`).then(r => r.json()),
-      fetch(`${base}/api/position?session_key=${key}`).then(r => r.json()),
-      fetch(`${base}/api/weather?session_key=${key}`).then(r => r.json()),
-      fetch(`${base}/api/intervals?session_key=${key}`).then(r => r.json()),
-      fetch(`${base}/api/race-controls?session_key=${key}`).then(r => r.json()),
-    ])
-      .then(([totalLapsData, lapData, tyreData, driverData, pitData, posData, weatherData, intervalData, raceControlData]) => {
-        if (totalLapsData.total_laps) {
+    setDataError(false);
+
+    fetch(`${base}/api/race-data?session_key=${key}`, { signal })
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then(data => {
+        if (signal.aborted) return;
+
+        const laps         = data.laps         ?? [];
+        const stints       = data.stints        ?? [];
+        const pitStopsData = data.pit_stops     ?? [];
+        const positions    = data.positions     ?? [];
+        const intervals    = data.intervals     ?? [];
+        const raceControl  = data.race_control  ?? [];
+        const weather      = data.weather       ?? [];
+        const drivers      = data.drivers       ?? [];
+        const totalLaps    = data.total_laps    ?? null;
+
+        if (!laps.length) { setDataError(true); setDataLoading(false); return; }
+
+        if (totalLaps) {
           setRaces(prev => prev.map(r =>
-            r.session_key === key ? { ...r, laps: totalLapsData.total_laps } : r
+            r.session_key === key ? { ...r, laps: totalLaps } : r
           ));
         }
-        if (weatherData.readings?.length) setWeatherReadings(weatherData.readings);
-        if (driverData.drivers?.length) setDrivers(driverData.drivers.map(adaptDriver));
-        setPitStops(pitData.pit_stops ?? []);
+
+        if (weather.length) setWeatherReadings(weather);
+        if (drivers.length) setDrivers(drivers.map(adaptDriver));
+        setPitStops(pitStopsData);
+
         const numToCode: Record<string, string> = {};
-        (driverData.drivers ?? []).forEach((d: any) => {
+        drivers.forEach((d: any) => {
           numToCode[String(d.driver_number)] = d.name_acronym;
         });
         setNumToCode(numToCode);
-        setRawPositions(posData.positions ?? []);
-        setRawIntervals(intervalData.intervals ?? []);
-        setRawRaceControl(raceControlData.controls ?? []);
+        setRawPositions(positions);
+        setRawIntervals(intervals);
+        setRawRaceControl(raceControl);
+        setRawLaps(laps);
 
-        if (lapData.laps?.length) {
-          setRawLaps(lapData.laps);
-
-          // Last lap completed per driver — distinguishes DNFs (few laps) from finishers
-          const lastLap: Record<string, number> = {};
-          for (const l of lapData.laps) {
-            const num = String(l.driver_number);
-            if (num && l.lap_number && (!lastLap[num] || l.lap_number > lastLap[num])) {
-              lastLap[num] = l.lap_number;
-            }
+        const lastLap: Record<string, number> = {};
+        for (const l of laps) {
+          const num = String(l.driver_number);
+          if (num && l.lap_number && (!lastLap[num] || l.lap_number > lastLap[num])) {
+            lastLap[num] = l.lap_number;
           }
-          setLastLapByNum(lastLap);
-
-          // Build lap→timestamp map: for each lap number, take the earliest date_start across all drivers
-          const lapDateMap: Record<number, string> = {};
-          for (const lap of lapData.laps) {
-            const n = lap.lap_number;
-            if (n && lap.date_start && (!lapDateMap[n] || lap.date_start < lapDateMap[n])) {
-              lapDateMap[n] = lap.date_start;
-            }
-          }
-          const maxLap = Math.max(...Object.keys(lapDateMap).map(Number));
-          const timestamps = Array.from({ length: maxLap }, (_, i) => lapDateMap[i + 1] ?? '');
-          setLapTimestamps(timestamps);
-
-          // Build ms-from-race-start offsets for the time scrubber
-          const raceStartEpoch = timestamps[0] ? new Date(timestamps[0]).getTime() : 0;
-          const offsets = timestamps.map(ts => ts ? new Date(ts).getTime() - raceStartEpoch : 0);
-          setLapStartOffsets(offsets);
-
-          // Race ends when the LAST driver crosses the finish line.
-          // Sum date_start + lap_duration for every lap row and take the maximum.
-          let raceEndEpoch = raceStartEpoch;
-          for (const l of lapData.laps) {
-            if (l.date_start && l.lap_duration) {
-              const end = new Date(l.date_start).getTime() + l.lap_duration * 1000;
-              if (end > raceEndEpoch) raceEndEpoch = end;
-            }
-          }
-          setRaceDurationMs(raceEndEpoch - raceStartEpoch);
-
-
-          const rawPositions = posData.positions ?? [];
-          const { chartData, rankings } = processRealLapData(lapData.laps, numToCode, rawPositions);
-
-          // OpenF1 often omits the final lap for all/some drivers — pad to race.laps
-          // so the scrubber's last position shows correct final standings.
-          while (chartData.length < race.laps && chartData.length > 0) {
-            const last = chartData[chartData.length - 1];
-            chartData.push({ ...last, lap: chartData.length + 1 });
-            const lastR = rankings[rankings.length - 1];
-            rankings.push({ ...lastR, lap: rankings.length + 1 });
-          }
-
-          let realResults = buildResultsFromLaps(lapData.laps, numToCode, rankings);
-
-          // Merge real tyre/stop data into results
-          if (tyreData.stints?.length) {
-            const stints = processStintData(tyreData.stints, numToCode, race.laps);
-            setStintsByCode(stints);
-            realResults = realResults.map(r => {
-              const s = stints[r.code] ?? [];
-              return {
-                ...r,
-                tyres: s.map(st => st.compound),
-                stops: Math.max(0, s.length - 1),
-              };
-            });
-          }
-
-          setChartData(chartData);
-          setRankings(rankings);
-          setResults(realResults);
         }
+        setLastLapByNum(lastLap);
+
+        const lapDateMap: Record<number, string> = {};
+        for (const lap of laps) {
+          const n = lap.lap_number;
+          if (n && lap.date_start && (!lapDateMap[n] || lap.date_start < lapDateMap[n])) {
+            lapDateMap[n] = lap.date_start;
+          }
+        }
+        const maxLap = Math.max(...Object.keys(lapDateMap).map(Number));
+        const timestamps = Array.from({ length: maxLap }, (_, i) => lapDateMap[i + 1] ?? '');
+        setLapTimestamps(timestamps);
+
+        const raceStartEpoch = timestamps[0] ? new Date(timestamps[0]).getTime() : 0;
+        const offsets = timestamps.map(ts => ts ? new Date(ts).getTime() - raceStartEpoch : 0);
+        setLapStartOffsets(offsets);
+
+        let raceEndEpoch = raceStartEpoch;
+        for (const l of laps) {
+          if (l.date_start && l.lap_duration) {
+            const end = new Date(l.date_start).getTime() + l.lap_duration * 1000;
+            if (end > raceEndEpoch) raceEndEpoch = end;
+          }
+        }
+        setRaceDurationMs(raceEndEpoch - raceStartEpoch);
+
+        const { chartData, rankings } = processRealLapData(laps, numToCode, positions);
+
+        while (chartData.length < race.laps && chartData.length > 0) {
+          const last = chartData[chartData.length - 1];
+          chartData.push({ ...last, lap: chartData.length + 1 });
+          const lastR = rankings[rankings.length - 1];
+          rankings.push({ ...lastR, lap: rankings.length + 1 });
+        }
+
+        let realResults = buildResultsFromLaps(laps, numToCode, rankings);
+
+        if (stints.length) {
+          const stintsByCode = processStintData(stints, numToCode, race.laps);
+          setStintsByCode(stintsByCode);
+          realResults = realResults.map(r => {
+            const s = stintsByCode[r.code] ?? [];
+            return {
+              ...r,
+              tyres: s.map((st: any) => st.compound),
+              stops: Math.max(0, s.length - 1),
+            };
+          });
+        }
+
+        setChartData(chartData);
+        setRankings(rankings);
+        setResults(realResults);
       })
-      .catch(() => {})
+      .catch(err => {
+        if (err.name !== 'AbortError') setDataError(true);
+      })
       .finally(() => setDataLoading(false));
+
+    return () => controller.abort();
   }, [race?.session_key]);
 
   const [selectedCode, setSelectedCode] = useState('');
@@ -516,84 +534,101 @@ export default function RacePage() {
     setRawRaceControl([]);
   }, [race?.session_key]);
 
-  // Live polling: re-fetch volatile data every 10s for today's (live) races (untested)
+  // Live polling — split by volatility to avoid unnecessary requests
+  // Fast (10s): positions, intervals, race control — change every few seconds
+  // Slow (30s): laps, tyres, pits, weather — change every lap or pit stop
   const isLive = race?.date === new Date().toISOString().slice(0, 10);
   useEffect(() => {
     if (!isLive || !race?.session_key) return;
     const key = race.session_key;
     const base = import.meta.env.VITE_API_URL;
 
-    const poll = () => {
-      Promise.all([
-        fetch(`${base}/api/race-controls?session_key=${key}`).then(r => r.json()),
-        fetch(`${base}/api/position?session_key=${key}`).then(r => r.json()),
-        fetch(`${base}/api/intervals?session_key=${key}`).then(r => r.json()),
-        fetch(`${base}/api/laps?session_key=${key}`).then(r => r.json()),
-        fetch(`${base}/api/total-laps?session_key=${key}`).then(r => r.json()),
-        fetch(`${base}/api/pitstops?session_key=${key}`).then(r => r.json()),
-        fetch(`${base}/api/tyres?session_key=${key}`).then(r => r.json()),
-        fetch(`${base}/api/weather?session_key=${key}`).then(r => r.json()),
-      ])
-        .then(([rcData, posData, ivData, lapData, totalLapsData, pitData, tyreData, weatherData]) => {
-          setRawRaceControl(rcData.controls ?? []);
-          setRawPositions(posData.positions ?? []);
-          setRawIntervals(ivData.intervals ?? []);
-          setPitStops(pitData.pit_stops ?? []);
-          if (weatherData.readings?.length) setWeatherReadings(weatherData.readings);
+    const get = (url: string) =>
+      fetch(url)
+        .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+        .catch(() => null);
 
-          if (totalLapsData.total_laps) {
-            setRaces(prev => prev.map(r =>
-              r.session_key === key ? { ...r, laps: totalLapsData.total_laps } : r
-            ));
-          }
-
-          if (lapData.laps?.length) {
-            setRawLaps(lapData.laps);
-
-            const lastLap: Record<string, number> = {};
-            for (const l of lapData.laps) {
-              const num = String(l.driver_number);
-              if (num && l.lap_number && (!lastLap[num] || l.lap_number > lastLap[num])) {
-                lastLap[num] = l.lap_number;
-              }
-            }
-            setLastLapByNum(lastLap);
-
-            const lapDateMap: Record<number, string> = {};
-            for (const l of lapData.laps) {
-              const n = l.lap_number;
-              if (n && l.date_start && (!lapDateMap[n] || l.date_start < lapDateMap[n])) {
-                lapDateMap[n] = l.date_start;
-              }
-            }
-            const maxLap = Math.max(...Object.keys(lapDateMap).map(Number));
-            const timestamps = Array.from({ length: maxLap }, (_, i) => lapDateMap[i + 1] ?? '');
-            setLapTimestamps(timestamps);
-
-            const raceStart = timestamps[0] ? new Date(timestamps[0]).getTime() : 0;
-            const offsets = timestamps.map(ts => ts ? new Date(ts).getTime() - raceStart : 0);
-            setLapStartOffsets(offsets);
-
-            let raceEnd = raceStart;
-            for (const l of lapData.laps) {
-              if (l.date_start && l.lap_duration) {
-                const end = new Date(l.date_start).getTime() + l.lap_duration * 1000;
-                if (end > raceEnd) raceEnd = end;
-              }
-            }
-            setRaceDurationMs(raceEnd - raceStart);
-
-            if (tyreData.stints?.length) {
-              const stints = processStintData(tyreData.stints, numToCode as any, totalLapsData.total_laps ?? maxLap);
-              setStintsByCode(stints);
-            }
-          }
-        })
-        .catch(() => {});
+    const pollFast = () => {
+      Promise.allSettled([
+        get(`${base}/api/race-controls?session_key=${key}`),
+        get(`${base}/api/position?session_key=${key}`),
+        get(`${base}/api/intervals?session_key=${key}`),
+      ]).then(([rcRes, posRes, ivRes]) => {
+        if (rcRes.status === 'fulfilled' && rcRes.value) setRawRaceControl(rcRes.value.controls ?? []);
+        if (posRes.status === 'fulfilled' && posRes.value) setRawPositions(posRes.value.positions ?? []);
+        if (ivRes.status === 'fulfilled' && ivRes.value) setRawIntervals(ivRes.value.intervals ?? []);
+      });
     };
 
-    const id = setInterval(poll, 10_000);
-    return () => clearInterval(id);
+    const pollSlow = () => {
+      Promise.allSettled([
+        get(`${base}/api/laps?session_key=${key}`),
+        get(`${base}/api/total-laps?session_key=${key}`),
+        get(`${base}/api/pitstops?session_key=${key}`),
+        get(`${base}/api/tyres?session_key=${key}`),
+        get(`${base}/api/weather?session_key=${key}`),
+      ]).then(([lapRes, totalRes, pitRes, tyreRes, weatherRes]) => {
+        const lapData      = lapRes.status   === 'fulfilled' ? lapRes.value   : null;
+        const totalData    = totalRes.status === 'fulfilled' ? totalRes.value : null;
+        const pitData      = pitRes.status   === 'fulfilled' ? pitRes.value   : null;
+        const tyreData     = tyreRes.status  === 'fulfilled' ? tyreRes.value  : null;
+        const weatherData  = weatherRes.status === 'fulfilled' ? weatherRes.value : null;
+
+        if (pitData) setPitStops(pitData.pit_stops ?? []);
+        if (weatherData?.readings?.length) setWeatherReadings(weatherData.readings);
+        if (totalData?.total_laps) {
+          setRaces(prev => prev.map(r =>
+            r.session_key === key ? { ...r, laps: totalData.total_laps } : r
+          ));
+        }
+
+        if (lapData?.laps?.length) {
+          setRawLaps(lapData.laps);
+
+          const lastLap: Record<string, number> = {};
+          for (const l of lapData.laps) {
+            const num = String(l.driver_number);
+            if (num && l.lap_number && (!lastLap[num] || l.lap_number > lastLap[num])) {
+              lastLap[num] = l.lap_number;
+            }
+          }
+          setLastLapByNum(lastLap);
+
+          const lapDateMap: Record<number, string> = {};
+          for (const l of lapData.laps) {
+            const n = l.lap_number;
+            if (n && l.date_start && (!lapDateMap[n] || l.date_start < lapDateMap[n])) {
+              lapDateMap[n] = l.date_start;
+            }
+          }
+          const maxLap = Math.max(...Object.keys(lapDateMap).map(Number));
+          const timestamps = Array.from({ length: maxLap }, (_, i) => lapDateMap[i + 1] ?? '');
+          setLapTimestamps(timestamps);
+
+          const raceStart = timestamps[0] ? new Date(timestamps[0]).getTime() : 0;
+          const offsets = timestamps.map(ts => ts ? new Date(ts).getTime() - raceStart : 0);
+          setLapStartOffsets(offsets);
+
+          let raceEnd = raceStart;
+          for (const l of lapData.laps) {
+            if (l.date_start && l.lap_duration) {
+              const end = new Date(l.date_start).getTime() + l.lap_duration * 1000;
+              if (end > raceEnd) raceEnd = end;
+            }
+          }
+          setRaceDurationMs(raceEnd - raceStart);
+
+          if (tyreData?.stints?.length) {
+            const stints = processStintData(tyreData.stints, numToCode as any, totalData?.total_laps ?? maxLap);
+            setStintsByCode(stints);
+          }
+        }
+      });
+    };
+
+    const fastId = setInterval(pollFast, 10_000);
+    const slowId = setInterval(pollSlow, 30_000);
+    return () => { clearInterval(fastId); clearInterval(slowId); };
   }, [isLive, race?.session_key]);
 
   // Scan all race control messages up to current time to determine caution state.
@@ -679,6 +714,25 @@ export default function RacePage() {
     );
   }
 
+  if (dataLoading) {
+    return (
+      <div className="app app--loading">
+        <div className="canvas-loader">
+          <div className="canvas-loader-inner">
+            <div className="cl-flag">
+              {countryFlagUrl(race.country)
+                ? <img src={countryFlagUrl(race.country)!} alt={race.country} className="cl-flag-img" />
+                : '🏁'}
+            </div>
+            <p className="cl-race">{race.name.toUpperCase()}</p>
+            <p className="cl-sub">LOADING RACE DATA</p>
+            <div className="loading-bar"><div className="loading-bar-fill" /></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`race-status ${activeGlow}`}>
       <div className="app">
@@ -700,20 +754,6 @@ export default function RacePage() {
           />
 
           <main className="canvas">
-            {dataLoading && (
-              <div className="canvas-loader">
-                <div className="canvas-loader-inner">
-                  <div className="cl-flag">
-                    {countryFlagUrl(race.country)
-                      ? <img src={countryFlagUrl(race.country)!} alt={race.country} className="cl-flag-img" />
-                      : '🏁'}
-                  </div>
-                  <p className="cl-race">{race.name.toUpperCase()}</p>
-                  <p className="cl-sub">LOADING RACE DATA</p>
-                  <div className="loading-bar"><div className="loading-bar-fill" /></div>
-                </div>
-              </div>
-            )}
             <CanvasHead
               race={race} activeYear={activeYear}
               lap={lap} rankings={rankings}

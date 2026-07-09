@@ -81,7 +81,8 @@ export default function AiChat({ race, sessionKey, currentLap }: Props) {
     setThinking(true);
 
     try {
-      const res = await fetch('http://localhost:8000/api/chat', {
+      const base = import.meta.env.VITE_API_URL;
+      const res = await fetch(`${base}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
